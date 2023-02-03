@@ -18,8 +18,18 @@ jobs:
         with:
           cmd: install
 
+      - name: Compress action step
+        uses: a7ul/tar-action@v1.1.0
+        id: compress
+        with:
+          command: c
+          cwd: ./
+          files: |
+            ./node_modules
+          outPath: node_modules.tar.gz
+
       - name: Upload a Build Artifact
         uses: actions/upload-artifact@v3.1.2
         with:
           name: packaged_node-modules
-          path: node_modules
+          path: node_modules.tar.gz
