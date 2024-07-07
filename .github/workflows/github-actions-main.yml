@@ -2,7 +2,7 @@ name: Joplin Continuous Integration
 on: [push, pull_request]
 jobs:
   pre_job:
-    if: github.repository == 'laurent22/joplin'
+    if: github.repository == 'ctr49/joplin'
     # Do not use unbuntu-latest because it causes `The operation was canceled` failures:
     # https://github.com/actions/runner-images/issues/6709
     runs-on: ubuntu-20.04
@@ -17,13 +17,13 @@ jobs:
   Main:
     needs: pre_job
     # We always process server or desktop release tags, because they also publish the release
-    if: github.repository == 'laurent22/joplin' && (needs.pre_job.outputs.should_skip != 'true' || startsWith(github.ref, 'refs/tags/server-v') || startsWith(github.ref, 'refs/tags/v'))
+    if: github.repository == 'ctr49/joplin' && (needs.pre_job.outputs.should_skip != 'true' || startsWith(github.ref, 'refs/tags/server-v') || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         # Do not use unbuntu-latest because it causes `The operation was canceled` failures:
         # https://github.com/actions/runner-images/issues/6709
-        os: [macos-12, ubuntu-20.04, windows-2019]
+        os: [ubuntu-20.04]
     steps:
 
       # Trying to fix random networking issues on Windows
@@ -158,7 +158,7 @@ jobs:
 
   ServerDockerImage:
     needs: pre_job
-    if: github.repository == 'laurent22/joplin' && needs.pre_job.outputs.should_skip != 'true'
+    if: github.repository == 'ctr49/joplin' && needs.pre_job.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
