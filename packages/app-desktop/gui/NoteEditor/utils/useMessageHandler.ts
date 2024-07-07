@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { FormNote } from './types';
+import { FormNote, HtmlToMarkdownHandler, MarkupToHtmlHandler, ScrollOptions } from './types';
 import contextMenu from './contextMenu';
 import CommandService from '@joplin/lib/services/CommandService';
 import PostMessageService from '@joplin/lib/services/PostMessageService';
@@ -7,12 +7,15 @@ import ResourceFetcher from '@joplin/lib/services/ResourceFetcher';
 import { reg } from '@joplin/lib/registry';
 const bridge = require('@electron/remote').require('./bridge').default;
 
-export default function useMessageHandler(scrollWhenReady: any, setScrollWhenReady: Function, editorRef: any, setLocalSearchResultCount: Function, dispatch: Function, formNote: FormNote) {
+// eslint-disable-next-line @typescript-eslint/ban-types, @typescript-eslint/no-explicit-any -- Old code before rule was applied, Old code before rule was applied
+export default function useMessageHandler(scrollWhenReady: ScrollOptions|null, clearScrollWhenReady: ()=> void, editorRef: any, setLocalSearchResultCount: Function, dispatch: Function, formNote: FormNote, htmlToMd: HtmlToMarkdownHandler, mdToHtml: MarkupToHtmlHandler) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	return useCallback(async (event: any) => {
 		const msg = event.channel ? event.channel : '';
 		const args = event.args;
 		const arg0 = args && args.length >= 1 ? args[0] : null;
 
+		// eslint-disable-next-line no-console
 		if (msg !== 'percentScroll') console.info(`Got ipc-message: ${msg}`, arg0);
 
 		if (msg.indexOf('error:') === 0) {
@@ -22,7 +25,7 @@ export default function useMessageHandler(scrollWhenReady: any, setScrollWhenRea
 		} else if (msg === 'noteRenderComplete') {
 			if (scrollWhenReady) {
 				const options = { ...scrollWhenReady };
-				setScrollWhenReady(null);
+				clearScrollWhenReady();
 				editorRef.current.scrollTo(options);
 			}
 		} else if (msg === 'setMarkerCount') {
@@ -41,9 +44,12 @@ export default function useMessageHandler(scrollWhenReady: any, setScrollWhenRea
 				linkToCopy: arg0.linkToCopy || null,
 				htmlToCopy: '',
 				insertContent: () => { console.warn('insertContent() not implemented'); },
+				fireEditorEvent: () => { console.warn('fireEditorEvent() not implemented'); },
+				htmlToMd,
+				mdToHtml,
 			}, dispatch);
 
-			menu.popup(bridge().window());
+			menu.popup({ window: bridge().window() });
 		} else if (msg.indexOf('#') === 0) {
 			// This is an internal anchor, which is handled by the WebView so skip this case
 		} else if (msg === 'contentScriptExecuteCommand') {

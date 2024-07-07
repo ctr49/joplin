@@ -3,17 +3,23 @@ const { GeolocationReact } = require('./geolocation-react.js');
 const PoorManIntervals = require('@joplin/lib/PoorManIntervals').default;
 const RNFetchBlob = require('rn-fetch-blob').default;
 const { generateSecureRandom } = require('react-native-securerandom');
-const FsDriverRN = require('./fs-driver-rn').default;
+const FsDriverRN = require('./fs-driver/fs-driver-rn').default;
 const { Buffer } = require('buffer');
 const { Linking, Platform } = require('react-native');
-const mimeUtils = require('@joplin/lib/mime-utils.js').mime;
+const showMessageBox = require('./showMessageBox.js').default;
+const mimeUtils = require('@joplin/lib/mime-utils.js');
 const { basename, fileExtension } = require('@joplin/lib/path-utils');
 const uuid = require('@joplin/lib/uuid').default;
 const Resource = require('@joplin/lib/models/Resource').default;
+const { getLocales } = require('react-native-localize');
+const { setLocale, defaultLocale, closestSupportedLocale } = require('@joplin/lib/locale');
 
 const injectedJs = {
 	webviewLib: require('@joplin/lib/rnInjectedJs/webviewLib'),
-	codeMirrorBundle: require('../lib/rnInjectedJs/CodeMirror.bundle'),
+	codeMirrorBundle: require('../lib/rnInjectedJs/codeMirrorBundle.bundle'),
+	svgEditorBundle: require('../lib/rnInjectedJs/svgEditorBundle.bundle'),
+	pluginBackgroundPage: require('../lib/rnInjectedJs/pluginBackgroundPage.bundle'),
+	noteBodyViewerBundle: require('../lib/rnInjectedJs/noteBodyViewerBundle.bundle'),
 };
 
 function shimInit() {
@@ -40,6 +46,8 @@ function shimInit() {
 	// This function can be used to debug "Network Request Failed" errors. It
 	// uses the native XMLHttpRequest which is more likely to get the proper
 	// response and error message.
+
+	/* eslint-disable no-console */
 
 	shim.debugFetch = async (url, options = null) => {
 		options = {
@@ -79,6 +87,32 @@ function shimInit() {
 			// TODO: Send POST data here if needed
 			xhr.send();
 		});
+	};
+
+	/* eslint-enable */
+
+	shim.detectAndSetLocale = (Setting) => {
+		// [
+		// 	{
+		// 		"countryCode": "US",
+		// 		"isRTL": false,
+		// 		"languageCode": "fr",
+		// 		"languageTag": "fr-US"
+		// 	},
+		// 	{
+		// 		"countryCode": "US",
+		// 		"isRTL": false,
+		// 		"languageCode": "en",
+		// 		"languageTag": "en-US"
+		// 	}
+		// ]
+
+		const locales = getLocales();
+		let locale = locales.length ? locales[0].languageTag : defaultLocale();
+		locale = closestSupportedLocale(locale);
+		Setting.setValue('locale', locale);
+		setLocale(locale);
+		return locale;
 	};
 
 	shim.fetch = async function(url, options = null) {
@@ -202,6 +236,8 @@ function shimInit() {
 
 	shim.Buffer = Buffer;
 
+	shim.showMessageBox = showMessageBox;
+
 	shim.openUrl = url => {
 		Linking.openURL(url);
 	};
@@ -211,8 +247,8 @@ function shimInit() {
 	};
 
 	shim.waitForFrame = () => {
-		return new Promise(function(resolve) {
-			requestAnimationFrame(function() {
+		return new Promise((resolve) => {
+			requestAnimationFrame(() => {
 				resolve();
 			});
 		});
@@ -247,7 +283,7 @@ function shimInit() {
 		await shim.fsDriver().copy(filePath, targetPath);
 
 		if (defaultProps) {
-			resource = Object.assign({}, resource, defaultProps);
+			resource = { ...resource, ...defaultProps };
 		}
 
 		const itDoes = await shim.fsDriver().waitTillExists(targetPath);

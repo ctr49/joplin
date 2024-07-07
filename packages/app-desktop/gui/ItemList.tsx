@@ -1,13 +1,15 @@
 import * as React from 'react';
+import { DragEventHandler, KeyboardEventHandler, UIEventHandler } from 'react';
 
-interface Props {
-	style: any;
+interface Props<ItemType> {
+	style: React.CSSProperties & { height: number };
 	itemHeight: number;
-	items: any[];
+	items: ItemType[];
 	disabled?: boolean;
-	onKeyDown?: Function;
-	itemRenderer: Function;
+	onKeyDown?: KeyboardEventHandler<HTMLElement>;
+	itemRenderer: (item: ItemType, index: number)=> React.JSX.Element;
 	className?: string;
+	onItemDrop?: DragEventHandler<HTMLElement>;
 }
 
 interface State {
@@ -15,12 +17,12 @@ interface State {
 	bottomItemIndex: number;
 }
 
-class ItemList extends React.Component<Props, State> {
+class ItemList<ItemType> extends React.Component<Props<ItemType>, State> {
 
 	private scrollTop_: number;
-	private listRef: any;
+	private listRef: React.MutableRefObject<HTMLDivElement>;
 
-	constructor(props: Props) {
+	public constructor(props: Props<ItemType>) {
 		super(props);
 
 		this.scrollTop_ = 0;
@@ -29,14 +31,15 @@ class ItemList extends React.Component<Props, State> {
 
 		this.onScroll = this.onScroll.bind(this);
 		this.onKeyDown = this.onKeyDown.bind(this);
+		this.onDrop = this.onDrop.bind(this);
 	}
 
-	visibleItemCount(props: Props = undefined) {
+	public visibleItemCount(props: Props<ItemType> = undefined) {
 		if (typeof props === 'undefined') props = this.props;
 		return Math.ceil(props.style.height / props.itemHeight);
 	}
 
-	updateStateItemIndexes(props: Props = undefined) {
+	public updateStateItemIndexes(props: Props<ItemType> = undefined) {
 		if (typeof props === 'undefined') props = this.props;
 
 		const topItemIndex = Math.floor(this.scrollTop_ / props.itemHeight);
@@ -51,36 +54,55 @@ class ItemList extends React.Component<Props, State> {
 		});
 	}
 
-	offsetTop() {
+	public offsetTop() {
 		return this.listRef.current ? this.listRef.current.offsetTop : 0;
 	}
 
-	offsetScroll() {
+	public offsetScroll() {
 		return this.scrollTop_;
 	}
 
-	UNSAFE_componentWillMount() {
+	public get container() {
+		return this.listRef.current;
+	}
+
+	public UNSAFE_componentWillMount() {
 		this.updateStateItemIndexes();
 	}
 
-	UNSAFE_componentWillReceiveProps(newProps: Props) {
+	public UNSAFE_componentWillReceiveProps(newProps: Props<ItemType>) {
 		this.updateStateItemIndexes(newProps);
 	}
 
-	onScroll(event: any) {
-		this.scrollTop_ = event.target.scrollTop;
+	public onScroll: UIEventHandler<HTMLDivElement> = event => {
+		this.scrollTop_ = (event.target as HTMLElement).scrollTop;
 		this.updateStateItemIndexes();
-	}
+	};
 
-	onKeyDown(event: any) {
+	public onKeyDown: KeyboardEventHandler<HTMLElement> = event => {
 		if (this.props.onKeyDown) this.props.onKeyDown(event);
+	};
+
+	public onDrop: DragEventHandler<HTMLElement> = event => {
+		if (this.props.onItemDrop) this.props.onItemDrop(event);
+	};
+
+	public get firstVisibleIndex() {
+		return Math.min(this.props.items.length - 1, this.state.topItemIndex);
 	}
 
-	makeItemIndexVisible(itemIndex: number) {
-		const top = Math.min(this.props.items.length - 1, this.state.topItemIndex);
-		const bottom = Math.max(0, this.state.bottomItemIndex);
+	public get lastVisibleIndex() {
+		return Math.max(0, this.state.bottomItemIndex);
+	}
 
-		if (itemIndex >= top && itemIndex <= bottom) return;
+	public isIndexVisible(itemIndex: number) {
+		return itemIndex >= this.firstVisibleIndex && itemIndex <= this.lastVisibleIndex;
+	}
+
+	public makeItemIndexVisible(itemIndex: number) {
+		if (this.isIndexVisible(itemIndex)) return;
+
+		const top = this.firstVisibleIndex;
 
 		let scrollTop = 0;
 		if (itemIndex < top) {
@@ -113,12 +135,13 @@ class ItemList extends React.Component<Props, State> {
 	// 	return true;
 	// }
 
-	render() {
+	public render() {
 		const items = this.props.items;
-		const style = Object.assign({}, this.props.style, {
+		const style: React.CSSProperties = {
+			...this.props.style,
 			overflowX: 'hidden',
 			overflowY: 'auto',
-		});
+		};
 
 		// if (this.props.disabled) style.opacity = 0.5;
 
@@ -141,7 +164,7 @@ class ItemList extends React.Component<Props, State> {
 		if (this.props.className) classes.push(this.props.className);
 
 		return (
-			<div ref={this.listRef} className={classes.join(' ')} style={style} onScroll={this.onScroll} onKeyDown={this.onKeyDown}>
+			<div ref={this.listRef} className={classes.join(' ')} style={style} onScroll={this.onScroll} onKeyDown={this.onKeyDown} onDrop={this.onDrop}>
 				{itemComps}
 			</div>
 		);

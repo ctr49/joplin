@@ -5,26 +5,29 @@ import { AppState } from '../app.reducer';
 
 interface Props {
 	tip: string;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onClick: Function;
 	themeId: number;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	style: any;
 }
 
 class HelpButtonComponent extends React.Component<Props> {
-	constructor(props: Props) {
+	public constructor(props: Props) {
 		super(props);
 
 		this.onClick = this.onClick.bind(this);
 	}
 
-	onClick() {
+	public onClick() {
 		if (this.props.onClick) this.props.onClick();
 	}
 
-	render() {
+	public render() {
 		const theme = themeStyle(this.props.themeId);
-		const style = Object.assign({}, this.props.style, { color: theme.color, textDecoration: 'none' });
+		const style = { ...this.props.style, color: theme.color, textDecoration: 'none' };
 		const helpIconStyle = { flex: 0, width: 16, height: 16, marginLeft: 10 };
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const extraProps: any = {};
 		if (this.props.tip) extraProps['data-tip'] = this.props.tip;
 		return (

@@ -1,5 +1,5 @@
 import { MasterKeyEntity } from './types';
-import Logger from '../../Logger';
+import Logger from '@joplin/utils/Logger';
 import shim from '../../shim';
 import Setting from '../../models/Setting';
 import MasterKey from '../../models/MasterKey';
@@ -26,8 +26,11 @@ interface DecryptedMasterKey {
 }
 
 export interface EncryptionCustomHandler {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	context?: any;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	encrypt(context: any, hexaBytes: string, password: string): Promise<string>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	decrypt(context: any, hexaBytes: string, password: string): Promise<string>;
 }
 
@@ -38,10 +41,12 @@ export enum EncryptionMethod {
 	SJCL4 = 4,
 	SJCL1a = 5,
 	Custom = 6,
+	SJCL1b = 7,
 }
 
 export interface EncryptOptions {
 	encryptionMethod?: EncryptionMethod;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onProgress?: Function;
 	encryptionHandler?: EncryptionCustomHandler;
 	masterKeyId?: string;
@@ -51,6 +56,7 @@ export default class EncryptionService {
 
 	public static instance_: EncryptionService = null;
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public static fsDriver_: any = null;
 
 	// Note: 1 MB is very slow with Node and probably even worse on mobile.
@@ -79,34 +85,6 @@ export default class EncryptionService {
 		},
 	};
 
-	constructor() {
-		// Note: 1 MB is very slow with Node and probably even worse on mobile.
-		//
-		// On mobile the time it takes to decrypt increases exponentially for some reason, so it's important
-		// to have a relatively small size so as not to freeze the app. For example, on Android 7.1 simulator
-		// with 4.1 GB RAM, it takes this much to decrypt a block;
-		//
-		// 50KB => 1000 ms
-		// 25KB => 250ms
-		// 10KB => 200ms
-		// 5KB => 10ms
-		//
-		// So making the block 10 times smaller make it 100 times faster! So for now using 5KB. This can be
-		// changed easily since the chunk size is incorporated into the encrypted data.
-		this.chunkSize_ = 5000;
-		this.decryptedMasterKeys_ = {};
-		this.defaultEncryptionMethod_ = EncryptionMethod.SJCL1a;
-		this.defaultMasterKeyEncryptionMethod_ = EncryptionMethod.SJCL4;
-
-		this.headerTemplates_ = {
-			// Template version 1
-			1: {
-				// Fields are defined as [name, valueSize, valueType]
-				fields: [['encryptionMethod', 2, 'int'], ['masterKeyId', 32, 'hex']],
-			},
-		};
-	}
-
 	public static instance() {
 		if (this.instance_) return this.instance_;
 		this.instance_ = new EncryptionService();
@@ -117,25 +95,26 @@ export default class EncryptionService {
 		return this.defaultMasterKeyEncryptionMethod_;
 	}
 
-	loadedMasterKeysCount() {
+	public loadedMasterKeysCount() {
 		return Object.keys(this.decryptedMasterKeys_).length;
 	}
 
-	chunkSize() {
+	public chunkSize() {
 		return this.chunkSize_;
 	}
 
-	defaultEncryptionMethod() {
+	public defaultEncryptionMethod() {
 		return this.defaultEncryptionMethod_;
 	}
 
-	setActiveMasterKeyId(id: string) {
+	public setActiveMasterKeyId(id: string) {
 		setActiveMasterKeyId(id);
 	}
 
-	activeMasterKeyId() {
+	public activeMasterKeyId() {
 		const id = getActiveMasterKeyId();
 		if (!id) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			const error: any = new Error('No master key is defined as active. Check this: Either one or more master keys exist but no password was provided for any of them. Or no master key exist. Or master keys and password exist, but none was set as active.');
 			error.code = 'noActiveMasterKey';
 			throw error;
@@ -162,12 +141,13 @@ export default class EncryptionService {
 		if (makeActive) this.setActiveMasterKeyId(model.id);
 	}
 
-	unloadMasterKey(model: MasterKeyEntity) {
+	public unloadMasterKey(model: MasterKeyEntity) {
 		delete this.decryptedMasterKeys_[model.id];
 	}
 
-	loadedMasterKey(id: string) {
+	public loadedMasterKey(id: string) {
 		if (!this.decryptedMasterKeys_[id]) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			const error: any = new Error(`Master key is not loaded: ${id}`);
 			error.code = 'masterKeyNotLoaded';
 			error.masterKeyId = id;
@@ -176,26 +156,27 @@ export default class EncryptionService {
 		return this.decryptedMasterKeys_[id];
 	}
 
-	loadedMasterKeyIds() {
+	public loadedMasterKeyIds() {
 		return Object.keys(this.decryptedMasterKeys_);
 	}
 
-	fsDriver() {
+	public fsDriver() {
 		if (!EncryptionService.fsDriver_) throw new Error('EncryptionService.fsDriver_ not set!');
 		return EncryptionService.fsDriver_;
 	}
 
-	sha256(string: string) {
+	public sha256(string: string) {
 		const sjcl = shim.sjclModule;
 		const bitArray = sjcl.hash.sha256.hash(string);
 		return sjcl.codec.hex.fromBits(bitArray);
 	}
 
-	async generateApiToken() {
+	public async generateApiToken() {
 		return await this.randomHexString(64);
 	}
 
 	private async randomHexString(byteCount: number) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const bytes: any[] = await shim.randomBytes(byteCount);
 		return bytes
 			.map(a => {
@@ -237,10 +218,9 @@ export default class EncryptionService {
 	}
 
 	private async generateMasterKeyContent_(password: string, options: EncryptOptions = null) {
-		options = Object.assign({}, {
-			encryptionMethod: this.defaultMasterKeyEncryptionMethod_,
-		}, options);
+		options = { encryptionMethod: this.defaultMasterKeyEncryptionMethod_, ...options };
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const bytes: any[] = await shim.randomBytes(256);
 		const hexaBytes = bytes.map(a => hexPad(a.toString(16), 2)).join('');
 
@@ -286,6 +266,7 @@ export default class EncryptionService {
 		return true;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private wrapSjclError(sjclError: any) {
 		const error = new Error(sjclError.message);
 		error.stack = sjclError.stack;
@@ -298,99 +279,131 @@ export default class EncryptionService {
 
 		const sjcl = shim.sjclModule;
 
-		// 2020-01-23: Deprecated and no longer secure due to the use og OCB2 mode - do not use.
-		if (method === EncryptionMethod.SJCL) {
-			try {
-				// Good demo to understand each parameter: https://bitwiseshiftleft.github.io/sjcl/demo/
-				return sjcl.json.encrypt(key, plainText, {
-					v: 1, // version
-					iter: 1000, // Defaults to 1000 in sjcl but since we're running this on mobile devices, use a lower value. Maybe review this after some time. https://security.stackexchange.com/questions/3959/recommended-of-iterations-when-using-pkbdf2-sha256
-					ks: 128, // Key size - "128 bits should be secure enough"
-					ts: 64, // ???
-					mode: 'ocb2', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
-					// "adata":"", // Associated Data - not needed?
-					cipher: 'aes',
-				});
-			} catch (error) {
-				throw this.wrapSjclError(error);
-			}
-		}
+		const handlers: Record<EncryptionMethod, ()=> string> = {
+			// 2020-01-23: Deprecated and no longer secure due to the use og OCB2 mode - do not use.
+			[EncryptionMethod.SJCL]: () => {
+				try {
+					// Good demo to understand each parameter: https://bitwiseshiftleft.github.io/sjcl/demo/
+					return sjcl.json.encrypt(key, plainText, {
+						v: 1, // version
+						iter: 1000, // Defaults to 1000 in sjcl but since we're running this on mobile devices, use a lower value. Maybe review this after some time. https://security.stackexchange.com/questions/3959/recommended-of-iterations-when-using-pkbdf2-sha256
+						ks: 128, // Key size - "128 bits should be secure enough"
+						ts: 64, // ???
+						mode: 'ocb2', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
+						// "adata":"", // Associated Data - not needed?
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
 
-		// 2020-03-06: Added method to fix https://github.com/laurent22/joplin/issues/2591
-		//             Also took the opportunity to change number of key derivations, per Isaac Potoczny's suggestion
-		if (method === EncryptionMethod.SJCL1a) {
-			try {
-				// We need to escape the data because SJCL uses encodeURIComponent to process the data and it only
-				// accepts UTF-8 data, or else it throws an error. And the notes might occasionally contain
-				// invalid UTF-8 data. Fixes https://github.com/laurent22/joplin/issues/2591
-				return sjcl.json.encrypt(key, escape(plainText), {
-					v: 1, // version
-					iter: 101, // Since the master key already uses key derivations and is secure, additional iteration here aren't necessary, which will make decryption faster. SJCL enforces an iter strictly greater than 100
-					ks: 128, // Key size - "128 bits should be secure enough"
-					ts: 64, // ???
-					mode: 'ccm', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
-					// "adata":"", // Associated Data - not needed?
-					cipher: 'aes',
-				});
-			} catch (error) {
-				throw this.wrapSjclError(error);
-			}
-		}
+			// 2020-03-06: Added method to fix https://github.com/laurent22/joplin/issues/2591
+			//             Also took the opportunity to change number of key derivations, per Isaac Potoczny's suggestion
+			// 2023-06-10: Deprecated in favour of SJCL1b
+			[EncryptionMethod.SJCL1a]: () => {
+				try {
+					// We need to escape the data because SJCL uses encodeURIComponent to process the data and it only
+					// accepts UTF-8 data, or else it throws an error. And the notes might occasionally contain
+					// invalid UTF-8 data. Fixes https://github.com/laurent22/joplin/issues/2591
+					return sjcl.json.encrypt(key, escape(plainText), {
+						v: 1, // version
+						iter: 101, // Since the master key already uses key derivations and is secure, additional iteration here aren't necessary, which will make decryption faster. SJCL enforces an iter strictly greater than 100
+						ks: 128, // Key size - "128 bits should be secure enough"
+						ts: 64, // ???
+						mode: 'ccm', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
+						// "adata":"", // Associated Data - not needed?
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
 
-		// 2020-01-23: Deprecated - see above.
-		// Was used to encrypt master keys
-		if (method === EncryptionMethod.SJCL2) {
-			try {
-				return sjcl.json.encrypt(key, plainText, {
-					v: 1,
-					iter: 10000,
-					ks: 256,
-					ts: 64,
-					mode: 'ocb2',
-					cipher: 'aes',
-				});
-			} catch (error) {
-				throw this.wrapSjclError(error);
-			}
-		}
+			// 2023-06-10: Changed AES-128 to AES-256 per TheQuantumPhysicist's suggestions
+			// https://github.com/laurent22/joplin/issues/7686
+			[EncryptionMethod.SJCL1b]: () => {
+				try {
+					// We need to escape the data because SJCL uses encodeURIComponent to process the data and it only
+					// accepts UTF-8 data, or else it throws an error. And the notes might occasionally contain
+					// invalid UTF-8 data. Fixes https://github.com/laurent22/joplin/issues/2591
+					return sjcl.json.encrypt(key, escape(plainText), {
+						v: 1, // version
+						iter: 101, // Since the master key already uses key derivations and is secure, additional iteration here aren't necessary, which will make decryption faster. SJCL enforces an iter strictly greater than 100
+						ks: 256, // Key size - "256-bit is the golden standard that we should follow."
+						ts: 64, // ???
+						mode: 'ccm', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
+						// "adata":"", // Associated Data - not needed?
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
 
-		if (method === EncryptionMethod.SJCL3) {
-			try {
-				// Good demo to understand each parameter: https://bitwiseshiftleft.github.io/sjcl/demo/
-				return sjcl.json.encrypt(key, plainText, {
-					v: 1, // version
-					iter: 1000, // Defaults to 1000 in sjcl. Since we're running this on mobile devices we need to be careful it doesn't affect performances too much. Maybe review this after some time. https://security.stackexchange.com/questions/3959/recommended-of-iterations-when-using-pkbdf2-sha256
-					ks: 128, // Key size - "128 bits should be secure enough"
-					ts: 64, // ???
-					mode: 'ccm', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
-					// "adata":"", // Associated Data - not needed?
-					cipher: 'aes',
-				});
-			} catch (error) {
-				throw this.wrapSjclError(error);
-			}
-		}
+			// 2020-01-23: Deprecated - see above.
+			// Was used to encrypt master keys
+			[EncryptionMethod.SJCL2]: () => {
+				try {
+					return sjcl.json.encrypt(key, plainText, {
+						v: 1,
+						iter: 10000,
+						ks: 256,
+						ts: 64,
+						mode: 'ocb2',
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
 
-		// Same as above but more secure (but slower) to encrypt master keys
-		if (method === EncryptionMethod.SJCL4) {
-			try {
-				return sjcl.json.encrypt(key, plainText, {
-					v: 1,
-					iter: 10000,
-					ks: 256,
-					ts: 64,
-					mode: 'ccm',
-					cipher: 'aes',
-				});
-			} catch (error) {
-				throw this.wrapSjclError(error);
-			}
-		}
+			// Don't know why we have this - it's not used anywhere. It must be
+			// kept however, in case some note somewhere is encrypted using this
+			// method.
+			[EncryptionMethod.SJCL3]: () => {
+				try {
+					// Good demo to understand each parameter: https://bitwiseshiftleft.github.io/sjcl/demo/
+					return sjcl.json.encrypt(key, plainText, {
+						v: 1, // version
+						iter: 1000, // Defaults to 1000 in sjcl. Since we're running this on mobile devices we need to be careful it doesn't affect performances too much. Maybe review this after some time. https://security.stackexchange.com/questions/3959/recommended-of-iterations-when-using-pkbdf2-sha256
+						ks: 128, // Key size - "128 bits should be secure enough"
+						ts: 64, // ???
+						mode: 'ccm', //  The cipher mode is a standard for how to use AES and other algorithms to encrypt and authenticate your message. OCB2 mode is slightly faster and has more features, but CCM mode has wider support because it is not patented.
+						// "adata":"", // Associated Data - not needed?
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
 
-		throw new Error(`Unknown encryption method: ${method}`);
+			// Same as above but more secure (but slower) to encrypt master keys
+			[EncryptionMethod.SJCL4]: () => {
+				try {
+					return sjcl.json.encrypt(key, plainText, {
+						v: 1,
+						iter: 10000,
+						ks: 256,
+						ts: 64,
+						mode: 'ccm',
+						cipher: 'aes',
+					});
+				} catch (error) {
+					throw this.wrapSjclError(error);
+				}
+			},
+
+			[EncryptionMethod.Custom]: () => {
+				// This is handled elsewhere but as a sanity check, throw an exception
+				throw new Error('Custom encryption method is not supported here');
+			},
+		};
+
+		return handlers[method]();
 	}
 
-	async decrypt(method: EncryptionMethod, key: string, cipherText: string) {
+	public async decrypt(method: EncryptionMethod, key: string, cipherText: string) {
 		if (!method) throw new Error('Encryption method is required');
 		if (!key) throw new Error('Encryption key is required');
 
@@ -400,7 +413,7 @@ export default class EncryptionService {
 		try {
 			const output = sjcl.json.decrypt(key, cipherText);
 
-			if (method === EncryptionMethod.SJCL1a) {
+			if (method === EncryptionMethod.SJCL1a || method === EncryptionMethod.SJCL1b) {
 				return unescape(output);
 			} else {
 				return output;
@@ -411,10 +424,9 @@ export default class EncryptionService {
 		}
 	}
 
-	async encryptAbstract_(source: any, destination: any, options: EncryptOptions = null) {
-		options = Object.assign({}, {
-			encryptionMethod: this.defaultEncryptionMethod(),
-		}, options);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private async encryptAbstract_(source: any, destination: any, options: EncryptOptions = null) {
+		options = { encryptionMethod: this.defaultEncryptionMethod(), ...options };
 
 		const method = options.encryptionMethod;
 		const masterKeyId = options.masterKeyId ? options.masterKeyId : this.activeMasterKeyId();
@@ -447,9 +459,11 @@ export default class EncryptionService {
 		}
 	}
 
-	async decryptAbstract_(source: any, destination: any, options: EncryptOptions = null) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private async decryptAbstract_(source: any, destination: any, options: EncryptOptions = null) {
 		if (!options) options = {};
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const header: any = await this.decodeHeaderSource_(source);
 		const masterKeyPlainText = this.loadedMasterKey(header.masterKeyId).plainText;
 
@@ -474,7 +488,7 @@ export default class EncryptionService {
 		}
 	}
 
-	stringReader_(string: string, sync = false) {
+	private stringReader_(string: string, sync = false) {
 		const reader = {
 			index: 0,
 			read: function(size: number) {
@@ -487,9 +501,11 @@ export default class EncryptionService {
 		return reader;
 	}
 
-	stringWriter_() {
+	private stringWriter_() {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const output: any = {
 			data: [],
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			append: async function(data: any) {
 				output.data.push(data);
 			},
@@ -501,7 +517,8 @@ export default class EncryptionService {
 		return output;
 	}
 
-	async fileReader_(path: string, encoding: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private async fileReader_(path: string, encoding: any) {
 		const handle = await this.fsDriver().open(path, 'r');
 		const reader = {
 			handle: handle,
@@ -515,8 +532,10 @@ export default class EncryptionService {
 		return reader;
 	}
 
-	async fileWriter_(path: string, encoding: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private async fileWriter_(path: string, encoding: any) {
 		return {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			append: async (data: any) => {
 				return this.fsDriver().appendFile(path, data, encoding);
 			},
@@ -524,6 +543,7 @@ export default class EncryptionService {
 		};
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public async encryptString(plainText: any, options: EncryptOptions = null): Promise<string> {
 		const source = this.stringReader_(plainText);
 		const destination = this.stringWriter_();
@@ -531,6 +551,7 @@ export default class EncryptionService {
 		return destination.result();
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public async decryptString(cipherText: any, options: EncryptOptions = null): Promise<string> {
 		const source = this.stringReader_(cipherText);
 		const destination = this.stringWriter_();
@@ -538,7 +559,7 @@ export default class EncryptionService {
 		return destination.data.join('');
 	}
 
-	async encryptFile(srcPath: string, destPath: string, options: EncryptOptions = null) {
+	public async encryptFile(srcPath: string, destPath: string, options: EncryptOptions = null) {
 		let source = await this.fileReader_(srcPath, 'base64');
 		let destination = await this.fileWriter_(destPath, 'ascii');
 
@@ -563,7 +584,7 @@ export default class EncryptionService {
 		await cleanUp();
 	}
 
-	async decryptFile(srcPath: string, destPath: string, options: EncryptOptions = null) {
+	public async decryptFile(srcPath: string, destPath: string, options: EncryptOptions = null) {
 		let source = await this.fileReader_(srcPath, 'ascii');
 		let destination = await this.fileWriter_(destPath, 'base64');
 
@@ -588,13 +609,15 @@ export default class EncryptionService {
 		await cleanUp();
 	}
 
-	headerTemplate(version: number) {
+	public headerTemplate(version: number) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const r = (this.headerTemplates_ as any)[version];
 		if (!r) throw new Error(`Unknown header version: ${version}`);
 		return r;
 	}
 
-	encodeHeader_(header: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public encodeHeader_(header: any) {
 		// Sanity check
 		if (header.masterKeyId.length !== 32) throw new Error(`Invalid master key ID size: ${header.masterKeyId}`);
 
@@ -605,12 +628,14 @@ export default class EncryptionService {
 		return `JED01${encryptionMetadata}`;
 	}
 
-	async decodeHeaderString(cipherText: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public async decodeHeaderString(cipherText: any) {
 		const source = this.stringReader_(cipherText);
 		return this.decodeHeaderSource_(source);
 	}
 
-	async decodeHeaderSource_(source: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private async decodeHeaderSource_(source: any) {
 		const identifier = await source.read(5);
 		if (!isValidHeaderIdentifier(identifier)) throw new JoplinError(`Invalid encryption identifier. Data is not actually encrypted? ID was: ${identifier}`, 'invalidIdentifier');
 		const mdSizeHex = await source.read(6);
@@ -620,7 +645,9 @@ export default class EncryptionService {
 		return this.decodeHeaderBytes_(identifier + mdSizeHex + md);
 	}
 
-	decodeHeaderBytes_(headerHexaBytes: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public decodeHeaderBytes_(headerHexaBytes: any) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const reader: any = this.stringReader_(headerHexaBytes, true);
 		const identifier = reader.read(3);
 		const version = parseInt(reader.read(2), 16);
@@ -629,6 +656,7 @@ export default class EncryptionService {
 
 		parseInt(reader.read(6), 16); // Read the size and move the reader pointer forward
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const output: any = {};
 
 		for (let i = 0; i < template.fields.length; i++) {
@@ -652,18 +680,19 @@ export default class EncryptionService {
 		return output;
 	}
 
-	isValidEncryptionMethod(method: EncryptionMethod) {
-		return [EncryptionMethod.SJCL, EncryptionMethod.SJCL1a, EncryptionMethod.SJCL2, EncryptionMethod.SJCL3, EncryptionMethod.SJCL4].indexOf(method) >= 0;
+	public isValidEncryptionMethod(method: EncryptionMethod) {
+		return [EncryptionMethod.SJCL, EncryptionMethod.SJCL1a, EncryptionMethod.SJCL1b, EncryptionMethod.SJCL2, EncryptionMethod.SJCL3, EncryptionMethod.SJCL4].indexOf(method) >= 0;
 	}
 
-	async itemIsEncrypted(item: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public async itemIsEncrypted(item: any) {
 		if (!item) throw new Error('No item');
 		const ItemClass = BaseItem.itemClass(item);
 		if (!ItemClass.encryptionSupported()) return false;
 		return item.encryption_applied && isValidHeaderIdentifier(item.encryption_cipher_text, true);
 	}
 
-	async fileIsEncrypted(path: string) {
+	public async fileIsEncrypted(path: string) {
 		const handle = await this.fsDriver().open(path, 'r');
 		const headerIdentifier = await this.fsDriver().readFileChunk(handle, 5, 'ascii');
 		await this.fsDriver().close(handle);

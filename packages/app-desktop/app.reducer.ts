@@ -4,10 +4,14 @@ import { defaultState, State } from '@joplin/lib/reducer';
 import iterateItems from './gui/ResizableLayout/utils/iterateItems';
 import { LayoutItem } from './gui/ResizableLayout/utils/types';
 import validateLayout from './gui/ResizableLayout/utils/validateLayout';
+import Logger from '@joplin/utils/Logger';
+
+const logger = Logger.create('app.reducer');
 
 export interface AppStateRoute {
 	type: string;
 	routeName: string;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	props: any;
 }
 
@@ -18,28 +22,39 @@ export enum AppStateDialogName {
 
 export interface AppStateDialog {
 	name: AppStateDialogName;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	props: Record<string, any>;
+}
+
+export interface EditorScrollPercents {
+	[noteId: string]: number;
 }
 
 export interface AppState extends State {
 	route: AppStateRoute;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	navHistory: any[];
 	noteVisiblePanes: string[];
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	windowContentSize: any;
 	watchedNoteFiles: string[];
-	lastEditorScrollPercents: any;
+	lastEditorScrollPercents: EditorScrollPercents;
 	devToolsVisible: boolean;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	visibleDialogs: any; // empty object if no dialog is visible. Otherwise contains the list of visible dialogs.
 	focusedField: string;
 	layoutMoveMode: boolean;
 	startupPluginsLoaded: boolean;
 
 	// Extra reducer keys go here
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	watchedResources: any;
 	mainLayout: LayoutItem;
 	dialogs: AppStateDialog[];
+	isResettingLayout: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 export function createAppDefaultState(windowContentSize: any, resourceEditWatcherDefaultState: any): AppState {
 	return {
 		...defaultState,
@@ -60,10 +75,12 @@ export function createAppDefaultState(windowContentSize: any, resourceEditWatche
 		mainLayout: null,
 		startupPluginsLoaded: false,
 		dialogs: [],
+		isResettingLayout: false,
 		...resourceEditWatcherDefaultState,
 	};
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 export default function(state: AppState, action: any) {
 	let newState = state;
 
@@ -80,7 +97,7 @@ export default function(state: AppState, action: any) {
 
 				const currentRoute = state.route;
 
-				newState = Object.assign({}, state);
+				newState = { ...state };
 				const newNavHistory = state.navHistory.slice();
 
 				if (goingBack) {
@@ -117,13 +134,14 @@ export default function(state: AppState, action: any) {
 
 		case 'WINDOW_CONTENT_SIZE_SET':
 
-			newState = Object.assign({}, state);
+			newState = { ...state };
 			newState.windowContentSize = action.size;
 			break;
 
 		case 'NOTE_VISIBLE_PANES_TOGGLE':
 
 			{
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 				const getNextLayout = (currentLayout: any) => {
 					currentLayout = panes.length === 2 ? 'both' : currentLayout[0];
 
@@ -145,7 +163,7 @@ export default function(state: AppState, action: any) {
 					return nextLayout === 'both' ? ['editor', 'viewer'] : [nextLayout];
 				};
 
-				newState = Object.assign({}, state);
+				newState = { ...state };
 
 				const panes = state.noteVisiblePanes.slice();
 				newState.noteVisiblePanes = getNextLayout(panes);
@@ -154,7 +172,7 @@ export default function(state: AppState, action: any) {
 
 		case 'NOTE_VISIBLE_PANES_SET':
 
-			newState = Object.assign({}, state);
+			newState = { ...state };
 			newState.noteVisiblePanes = action.panes;
 			break;
 
@@ -169,22 +187,32 @@ export default function(state: AppState, action: any) {
 		case 'MAIN_LAYOUT_SET_ITEM_PROP':
 
 			{
-				let newLayout = produce(state.mainLayout, (draftLayout: LayoutItem) => {
-					iterateItems(draftLayout, (_itemIndex: number, item: LayoutItem, _parent: LayoutItem) => {
-						if (item.key === action.itemKey) {
-							(item as any)[action.propName] = action.propValue;
-							return false;
-						}
-						return true;
+				if (!state.mainLayout) {
+					logger.warn('MAIN_LAYOUT_SET_ITEM_PROP: Trying to set an item prop on the layout, but layout is empty: ', JSON.stringify(action));
+				} else {
+					let newLayout = produce(state.mainLayout, (draftLayout: LayoutItem) => {
+						iterateItems(draftLayout, (_itemIndex: number, item: LayoutItem, _parent: LayoutItem) => {
+							if (!item) {
+								logger.warn('MAIN_LAYOUT_SET_ITEM_PROP: Found an empty item in layout: ', JSON.stringify(state.mainLayout));
+							} else {
+								if (item.key === action.itemKey) {
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+									(item as any)[action.propName] = action.propValue;
+									return false;
+								}
+							}
+
+							return true;
+						});
 					});
-				});
 
-				if (newLayout !== state.mainLayout) newLayout = validateLayout(newLayout);
+					if (newLayout !== state.mainLayout) newLayout = validateLayout(newLayout);
 
-				newState = {
-					...state,
-					mainLayout: newLayout,
-				};
+					newState = {
+						...state,
+						mainLayout: newLayout,
+					};
+				}
 			}
 
 			break;
@@ -192,7 +220,7 @@ export default function(state: AppState, action: any) {
 		case 'NOTE_FILE_WATCHER_ADD':
 
 			if (newState.watchedNoteFiles.indexOf(action.id) < 0) {
-				newState = Object.assign({}, state);
+				newState = { ...state };
 				const watchedNoteFiles = newState.watchedNoteFiles.slice();
 				watchedNoteFiles.push(action.id);
 				newState.watchedNoteFiles = watchedNoteFiles;
@@ -202,7 +230,7 @@ export default function(state: AppState, action: any) {
 		case 'NOTE_FILE_WATCHER_REMOVE':
 
 			{
-				newState = Object.assign({}, state);
+				newState = { ...state };
 				const idx = newState.watchedNoteFiles.indexOf(action.id);
 				if (idx >= 0) {
 					const watchedNoteFiles = newState.watchedNoteFiles.slice();
@@ -215,7 +243,7 @@ export default function(state: AppState, action: any) {
 		case 'NOTE_FILE_WATCHER_CLEAR':
 
 			if (state.watchedNoteFiles.length) {
-				newState = Object.assign({}, state);
+				newState = { ...state };
 				newState.watchedNoteFiles = [];
 			}
 			break;
@@ -223,38 +251,38 @@ export default function(state: AppState, action: any) {
 		case 'EDITOR_SCROLL_PERCENT_SET':
 
 			{
-				newState = Object.assign({}, state);
-				const newPercents = Object.assign({}, newState.lastEditorScrollPercents);
+				newState = { ...state };
+				const newPercents = { ...newState.lastEditorScrollPercents };
 				newPercents[action.noteId] = action.percent;
 				newState.lastEditorScrollPercents = newPercents;
 			}
 			break;
 
 		case 'NOTE_DEVTOOLS_TOGGLE':
-			newState = Object.assign({}, state);
+			newState = { ...state };
 			newState.devToolsVisible = !newState.devToolsVisible;
 			break;
 
 		case 'NOTE_DEVTOOLS_SET':
-			newState = Object.assign({}, state);
+			newState = { ...state };
 			newState.devToolsVisible = action.value;
 			break;
 
 		case 'VISIBLE_DIALOGS_ADD':
-			newState = Object.assign({}, state);
-			newState.visibleDialogs = Object.assign({}, newState.visibleDialogs);
+			newState = { ...state };
+			newState.visibleDialogs = { ...newState.visibleDialogs };
 			newState.visibleDialogs[action.name] = true;
 			break;
 
 		case 'VISIBLE_DIALOGS_REMOVE':
-			newState = Object.assign({}, state);
-			newState.visibleDialogs = Object.assign({}, newState.visibleDialogs);
+			newState = { ...state };
+			newState.visibleDialogs = { ...newState.visibleDialogs };
 			delete newState.visibleDialogs[action.name];
 			break;
 
 		case 'FOCUS_SET':
 
-			newState = Object.assign({}, state);
+			newState = { ...state };
 			newState.focusedField = action.field;
 			break;
 
@@ -262,7 +290,7 @@ export default function(state: AppState, action: any) {
 
 			// A field can only clear its own state
 			if (action.field === state.focusedField) {
-				newState = Object.assign({}, state);
+				newState = { ...state };
 				newState.focusedField = null;
 			}
 			break;
@@ -279,7 +307,7 @@ export default function(state: AppState, action: any) {
 					isOpen = action.isOpen !== false;
 				}
 
-				newState = Object.assign({}, state);
+				newState = { ...state };
 
 				if (isOpen) {
 					const newDialogs = newState.dialogs.slice();
@@ -308,7 +336,16 @@ export default function(state: AppState, action: any) {
 			};
 			break;
 
+
+		case 'RESET_LAYOUT':
+			newState = {
+				...state,
+				isResettingLayout: action.value,
+			};
+			break;
+
 		}
+
 	} catch (error) {
 		error.message = `In reducer: ${error.message} Action: ${JSON.stringify(action)}`;
 		throw error;

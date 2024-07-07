@@ -2,7 +2,7 @@ import { expectNotThrow, naughtyStrings, setupDatabaseAndSynchronizer, switchCli
 import Note from '../models/Note';
 import Revision, { ObjectPatch } from '../models/Revision';
 
-describe('models/Revision', function() {
+describe('models/Revision', () => {
 
 	beforeEach(async () => {
 		await setupDatabaseAndSynchronizer(1);
@@ -49,6 +49,7 @@ describe('models/Revision', function() {
 
 		for (const t of testCases) {
 			const [expected, input] = t;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			expect(Revision.isEmptyRevision(input as any)).toBe(expected);
 		}
 	});
@@ -204,6 +205,7 @@ describe('models/Revision', function() {
 		expect(newRevs[2].id).toBe('789');
 	}));
 
+	// cSpell:disable
 	it('should create patch stats', (async () => {
 		const tests = [
 			{
@@ -240,5 +242,6 @@ describe('models/Revision', function() {
 			expect(stats.added).toBe(test.expected[1]);
 		}
 	}));
+	// cSpell:enable
 
 });

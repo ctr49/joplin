@@ -4,40 +4,58 @@ import ButtonBar from './ButtonBar';
 import Button, { ButtonLevel, ButtonSize } from '../Button/Button';
 import { _ } from '@joplin/lib/locale';
 import bridge from '../../services/bridge';
-import Setting, { AppType, SyncStartupOperation } from '@joplin/lib/models/Setting';
+import Setting, { AppType, SettingItemSubType, SyncStartupOperation } from '@joplin/lib/models/Setting';
 import control_PluginsStates from './controls/plugins/PluginsStates';
 import EncryptionConfigScreen from '../EncryptionConfigScreen/EncryptionConfigScreen';
 import { reg } from '@joplin/lib/registry';
 const { connect } = require('react-redux');
 const { themeStyle } = require('@joplin/lib/theme');
-const pathUtils = require('@joplin/lib/path-utils');
+import * as pathUtils from '@joplin/lib/path-utils';
 import SyncTargetRegistry from '@joplin/lib/SyncTargetRegistry';
-const shared = require('@joplin/lib/components/shared/config-shared.js');
+import * as shared from '@joplin/lib/components/shared/config/config-shared.js';
 import ClipperConfigScreen from '../ClipperConfigScreen';
 import restart from '../../services/restart';
-import PluginService from '@joplin/lib/services/plugins/PluginService';
-import { getDefaultPluginsInstallState, updateDefaultPluginsInstallState } from '@joplin/lib/services/plugins/defaultPlugins/defaultPluginsUtils';
-import getDefaultPluginsInfo from '@joplin/lib/services/plugins/defaultPlugins/desktopDefaultPluginsInfo';
+import JoplinCloudConfigScreen from '../JoplinCloudConfigScreen';
+import ToggleAdvancedSettingsButton from './controls/ToggleAdvancedSettingsButton';
+import shouldShowMissingPasswordWarning from '@joplin/lib/components/shared/config/shouldShowMissingPasswordWarning';
+import MacOSMissingPasswordHelpLink from './controls/MissingPasswordHelpLink';
 const { KeymapConfigScreen } = require('../KeymapConfig/KeymapConfigScreen');
+import FontSearch from './FontSearch';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 const settingKeyToControl: any = {
 	'plugins.states': control_PluginsStates,
 };
 
+interface Font {
+	family: string;
+}
+
+declare global {
+	interface Window {
+		queryLocalFonts(): Promise<Font[]>;
+	}
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 class ConfigScreenComponent extends React.Component<any, any> {
 
-	rowStyle_: any = null;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private rowStyle_: any = null;
 
-	constructor(props: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public constructor(props: any) {
 		super(props);
 
-		shared.init(this, reg);
+		shared.init(reg);
 
 		this.state = {
+			...shared.defaultScreenState,
 			selectedSectionName: 'general',
 			screenName: '',
 			changedSettingKeys: [],
 			needRestart: false,
+			fonts: [],
 		};
 
 		this.rowStyle_ = {
@@ -55,21 +73,33 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		this.handleSettingButton = this.handleSettingButton.bind(this);
 	}
 
-	async checkSyncConfig_() {
+	private async checkSyncConfig_() {
+		if (this.state.settings['sync.target'] === SyncTargetRegistry.nameToId('joplinCloud')) {
+			const isAuthenticated = await reg.syncTarget().isAuthenticated();
+			if (!isAuthenticated) {
+				return this.props.dispatch({
+					type: 'NAV_GO',
+					routeName: 'JoplinCloudLogin',
+				});
+			}
+		}
 		await shared.checkSyncConfig(this, this.state.settings);
 	}
 
-	UNSAFE_componentWillMount() {
+	public UNSAFE_componentWillMount() {
 		this.setState({ settings: this.props.settings });
 	}
 
-	componentDidMount() {
+	public async componentDidMount() {
 		if (this.props.defaultSection) {
 			this.setState({ selectedSectionName: this.props.defaultSection }, () => {
-				this.switchSection(this.props.defaultSection);
+				void this.switchSection(this.props.defaultSection);
 			});
 		}
-		updateDefaultPluginsInstallState(getDefaultPluginsInstallState(PluginService.instance(), Object.keys(getDefaultPluginsInfo())), this);
+
+		const fonts = (await window.queryLocalFonts()).map((font: Font) => font.family);
+		const uniqueFonts = [...new Set(fonts)];
+		this.setState({ fonts: uniqueFonts });
 	}
 
 	private async handleSettingButton(key: string) {
@@ -93,8 +123,8 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		}
 	}
 
-	sectionByName(name: string) {
-		const sections = shared.settingsSections({ device: 'desktop', settings: this.state.settings });
+	public sectionByName(name: string) {
+		const sections = shared.settingsSections({ device: AppType.Desktop, settings: this.state.settings });
 		for (const section of sections) {
 			if (section.name === name) return section;
 		}
@@ -102,15 +132,16 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		throw new Error(`Invalid section name: ${name}`);
 	}
 
-	screenFromName(screenName: string) {
+	public screenFromName(screenName: string) {
 		if (screenName === 'encryption') return <EncryptionConfigScreen/>;
 		if (screenName === 'server') return <ClipperConfigScreen themeId={this.props.themeId}/>;
 		if (screenName === 'keymap') return <KeymapConfigScreen themeId={this.props.themeId}/>;
+		if (screenName === 'joplinCloud') return <JoplinCloudConfigScreen />;
 
 		throw new Error(`Invalid screen name: ${screenName}`);
 	}
 
-	switchSection(name: string) {
+	public async switchSection(name: string) {
 		const section = this.sectionByName(name);
 		let screenName = '';
 		if (section.isScreen) {
@@ -118,30 +149,35 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 			if (this.hasChanges()) {
 				const ok = confirm(_('This will open a new screen. Save your current changes?'));
-				if (ok) shared.saveSettings(this);
+				if (ok) {
+					await shared.saveSettings(this);
+				}
 			}
 		}
 
 		this.setState({ selectedSectionName: section.name, screenName: screenName });
 	}
 
-	sidebar_selectionChange(event: any) {
-		this.switchSection(event.section.name);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private sidebar_selectionChange(event: any) {
+		void this.switchSection(event.section.name);
 	}
 
-	renderSectionDescription(section: any) {
-		const description = Setting.sectionDescription(section.name);
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public renderSectionDescription(section: any) {
+		const description = Setting.sectionDescription(section.name, AppType.Desktop);
 		if (!description) return null;
 
 		const theme = themeStyle(this.props.themeId);
 		return (
-			<div style={Object.assign({}, theme.textStyle, { marginBottom: 15 })}>
+			<div style={{ ...theme.textStyle, marginBottom: 15 }}>
 				{description}
 			</div>
 		);
 	}
 
-	sectionToComponent(key: string, section: any, settings: any, selected: boolean) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public sectionToComponent(key: string, section: any, settings: any, selected: boolean) {
 		const theme = themeStyle(this.props.themeId);
 
 		const createSettingComponents = (advanced: boolean) => {
@@ -159,10 +195,12 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		const settingComps = createSettingComponents(false);
 		const advancedSettingComps = createSettingComponents(true);
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const sectionWidths: Record<string, any> = {
 			plugins: '100%',
 		};
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const sectionStyle: any = {
 			marginTop: 20,
 			marginBottom: 20,
@@ -177,7 +215,24 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 		if (section.name === 'sync') {
 			const syncTargetMd = SyncTargetRegistry.idToMetadata(settings['sync.target']);
-			const statusStyle = Object.assign({}, theme.textStyle, { marginTop: 10 });
+			const statusStyle = { ...theme.textStyle, marginTop: 10 };
+			const warningStyle = { ...theme.textStyle, color: theme.colorWarn };
+
+			// Don't show the missing password warning if the user just changed the sync target (but hasn't
+			// saved yet).
+			const matchesSavedTarget = settings['sync.target'] === this.props.settings['sync.target'];
+			if (matchesSavedTarget && shouldShowMissingPasswordWarning(settings['sync.target'], settings)) {
+				settingComps.push(
+					<p key='missing-password-warning' style={warningStyle}>
+						{_('%s: Missing password.', _('Warning'))}
+						{' '}
+						<MacOSMissingPasswordHelpLink
+							theme={theme}
+							text={_('Help')}
+						/>
+					</p>,
+				);
+			}
 
 			if (syncTargetMd.supportsConfigCheck) {
 				const messages = shared.checkSyncConfigMessages(this);
@@ -188,6 +243,24 @@ class ConfigScreenComponent extends React.Component<any, any> {
 					</div>
 				);
 
+				if (settings['sync.target'] === SyncTargetRegistry.nameToId('joplinCloud')) {
+					const goToJoplinCloudLogin = () => {
+						this.props.dispatch({
+							type: 'NAV_GO',
+							routeName: 'JoplinCloudLogin',
+						});
+					};
+					settingComps.push(
+						<div key="connect_to_joplin_cloud_button" style={this.rowStyle_}>
+							<Button
+								title={_('Connect to Joplin Cloud')}
+								level={ButtonLevel.Primary}
+								onClick={goToJoplinCloudLogin}
+							/>
+						</div>,
+					);
+				}
+
 				settingComps.push(
 					<div key="check_sync_config_button" style={this.rowStyle_}>
 						<Button
@@ -197,7 +270,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 							onClick={this.checkSyncConfig_}
 						/>
 						{statusComp}
-					</div>
+					</div>,
 				);
 			}
 		}
@@ -206,17 +279,11 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		const advancedSettingsSectionStyle = { display: 'none' };
 
 		if (advancedSettingComps.length) {
-			const iconName = this.state.showAdvancedSettings ? 'fa fa-angle-down' : 'fa fa-angle-right';
-			// const advancedSettingsButtonStyle = Object.assign({}, theme.buttonStyle, { marginBottom: 10 });
 			advancedSettingsButton = (
-				<div style={{ marginBottom: 10 }}>
-					<Button
-						level={ButtonLevel.Secondary}
-						onClick={() => shared.advancedSettingsButton_click(this)}
-						iconName={iconName}
-						title={_('Show Advanced Settings')}
-					/>
-				</div>
+				<ToggleAdvancedSettingsButton
+					onClick={() => shared.advancedSettingsButton_click(this)}
+					advancedSettingsVisible={this.state.showAdvancedSettings}
+				/>
 			);
 			advancedSettingsSectionStyle.display = this.state.showAdvancedSettings ? 'block' : 'none';
 		}
@@ -233,23 +300,19 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 	private labelStyle(themeId: number) {
 		const theme = themeStyle(themeId);
-		return Object.assign({}, theme.textStyle, {
-			display: 'block',
+		return { ...theme.textStyle, display: 'block',
 			color: theme.color,
 			fontSize: theme.fontSize * 1.083333,
 			fontWeight: 500,
-			marginBottom: theme.mainPadding / 2,
-		});
+			marginBottom: theme.mainPadding / 2 };
 	}
 
 	private descriptionStyle(themeId: number) {
 		const theme = themeStyle(themeId);
-		return Object.assign({}, theme.textStyle, {
-			color: theme.colorFaded,
+		return { ...theme.textStyle, color: theme.colorFaded,
 			fontStyle: 'italic',
 			maxWidth: '70em',
-			marginTop: 5,
-		});
+			marginTop: 5 };
 	}
 
 	private renderLabel(themeId: number, label: string) {
@@ -261,17 +324,16 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		);
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private renderHeader(themeId: number, label: string, style: any = null) {
 		const theme = themeStyle(themeId);
 
-		const labelStyle = Object.assign({}, theme.textStyle, {
-			display: 'block',
+		const labelStyle = { ...theme.textStyle, display: 'block',
 			color: theme.color,
 			fontSize: theme.fontSize * 1.25,
 			fontWeight: 500,
 			marginBottom: theme.mainPadding,
-			...style,
-		});
+			...style };
 
 		return (
 			<div style={labelStyle}>
@@ -284,9 +346,11 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		return description ? <div style={this.descriptionStyle(themeId)}>{description}</div> : null;
 	}
 
-	settingToComponent(key: string, value: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public settingToComponent(key: string, value: any) {
 		const theme = themeStyle(this.props.themeId);
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const output: any = null;
 
 		const rowStyle = {
@@ -295,17 +359,13 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 		const labelStyle = this.labelStyle(this.props.themeId);
 
-		const subLabel = Object.assign({}, labelStyle, {
-			display: 'block',
+		const subLabel = { ...labelStyle, display: 'block',
 			opacity: 0.7,
-			marginBottom: labelStyle.marginBottom,
-		});
+			marginBottom: labelStyle.marginBottom };
 
-		const checkboxLabelStyle = Object.assign({}, labelStyle, {
-			marginLeft: 8,
+		const checkboxLabelStyle = { ...labelStyle, marginLeft: 8,
 			display: 'inline',
-			backgroundColor: 'transparent',
-		});
+			backgroundColor: 'transparent' };
 
 		const controlStyle = {
 			display: 'inline-block',
@@ -314,8 +374,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 			backgroundColor: theme.backgroundColor,
 		};
 
-		const textInputBaseStyle = Object.assign({}, controlStyle, {
-			fontFamily: theme.fontFamily,
+		const textInputBaseStyle = { ...controlStyle, fontFamily: theme.fontFamily,
 			border: '1px solid',
 			padding: '4px 6px',
 			boxSizing: 'border-box',
@@ -324,19 +383,15 @@ class ConfigScreenComponent extends React.Component<any, any> {
 			paddingLeft: 6,
 			paddingRight: 6,
 			paddingTop: 4,
-			paddingBottom: 4,
-		});
+			paddingBottom: 4 };
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const updateSettingValue = (key: string, value: any) => {
 			const md = Setting.settingMetadata(key);
 			if (md.needRestart) {
 				this.setState({ needRestart: true });
 			}
 			shared.updateSettingValue(this, key, value);
-
-			if (md.autoSave) {
-				shared.scheduleSaveSettings(this);
-			}
 		};
 
 		const md = Setting.settingMetadata(key);
@@ -350,11 +405,12 @@ class ConfigScreenComponent extends React.Component<any, any> {
 			return (
 				<div key={key} style={rowStyle}>
 					{label}
-					{this.renderDescription(this.props.themeId, md.description ? md.description() : null)}
+					{this.renderDescription(this.props.themeId, md.description ? md.description(AppType.Desktop) : null)}
 					<SettingComponent
 						metadata={md}
 						value={value}
 						themeId={this.props.themeId}
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 						onChange={(event: any) => {
 							updateSettingValue(key, event.value);
 						}}
@@ -377,18 +433,16 @@ class ConfigScreenComponent extends React.Component<any, any> {
 				items.push(
 					<option value={e.key.toString()} key={e.key}>
 						{settingOptions[e.key]}
-					</option>
+					</option>,
 				);
 			}
 
-			const selectStyle = Object.assign({}, controlStyle, {
-				paddingLeft: 6,
+			const selectStyle = { ...controlStyle, paddingLeft: 6,
 				paddingRight: 6,
 				paddingTop: 4,
 				paddingBottom: 4,
 				borderColor: theme.borderColor4,
-				borderRadius: 3,
-			});
+				borderRadius: 3 };
 
 			return (
 				<div key={key} style={rowStyle}>
@@ -398,6 +452,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 					<select
 						value={value}
 						style={selectStyle}
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 						onChange={(event: any) => {
 							updateSettingValue(key, event.target.value);
 						}}
@@ -443,10 +498,9 @@ class ConfigScreenComponent extends React.Component<any, any> {
 				</div>
 			);
 		} else if (md.type === Setting.TYPE_STRING) {
-			const inputStyle: any = Object.assign({}, textInputBaseStyle, {
-				width: '50%',
-				minWidth: '20em',
-			});
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+			const inputStyle: any = { ...textInputBaseStyle, width: '50%',
+				minWidth: '20em' };
 			const inputType = md.secure === true ? 'password' : 'text';
 
 			if (md.subType === 'file_path_and_args' || md.subType === 'file_path' || md.subType === 'directory_path') {
@@ -472,6 +526,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 					return cmdString;
 				};
 
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 				const onPathChange = (event: any) => {
 					if (md.subType === 'file_path_and_args') {
 						const cmd = splitCmd(this.state.settings[key]);
@@ -482,6 +537,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 					}
 				};
 
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 				const onArgsChange = (event: any) => {
 					const cmd = splitCmd(this.state.settings[key]);
 					cmd[1] = event.target.value;
@@ -518,6 +574,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 						<input
 							type={inputType}
 							style={inputStyle}
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 							onChange={(event: any) => {
 								onArgsChange(event);
 							}}
@@ -542,7 +599,8 @@ class ConfigScreenComponent extends React.Component<any, any> {
 									<div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: inputStyle.marginBottom }}>
 										<input
 											type={inputType}
-											style={Object.assign({}, inputStyle, { marginBottom: 0, marginRight: 5 })}
+											style={{ ...inputStyle, marginBottom: 0, marginRight: 5 }}
+											// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 											onChange={(event: any) => {
 												onPathChange(event);
 											}}
@@ -556,6 +614,9 @@ class ConfigScreenComponent extends React.Component<any, any> {
 											size={ButtonSize.Small}
 										/>
 									</div>
+									<div style={{ width: inputStyle.width, minWidth: inputStyle.minWidth }}>
+										{descriptionComp}
+									</div>
 								</div>
 							</div>
 						</div>
@@ -563,24 +624,36 @@ class ConfigScreenComponent extends React.Component<any, any> {
 					</div>
 				);
 			} else {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 				const onTextChange = (event: any) => {
 					updateSettingValue(key, event.target.value);
 				};
-
 				return (
 					<div key={key} style={rowStyle}>
 						<div style={labelStyle}>
 							<label>{md.label()}</label>
 						</div>
-						<input
-							type={inputType}
-							style={inputStyle}
-							value={this.state.settings[key]}
-							onChange={(event: any) => {
-								onTextChange(event);
-							}}
-							spellCheck={false}
-						/>
+						{
+							md.subType === SettingItemSubType.FontFamily || md.subType === SettingItemSubType.MonospaceFontFamily ?
+								<FontSearch
+									type={inputType}
+									style={inputStyle}
+									value={this.state.settings[key]}
+									availableFonts={this.state.fonts}
+									onChange={fontFamily => updateSettingValue(key, fontFamily)}
+									subtype={md.subType}
+								/> :
+								<input
+									type={inputType}
+									style={inputStyle}
+									value={this.state.settings[key]}
+									// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+									onChange={(event: any) => {
+										onTextChange(event);
+									}}
+									spellCheck={false}
+								/>
+						}
 						<div style={{ width: inputStyle.width, minWidth: inputStyle.minWidth }}>
 							{descriptionComp}
 						</div>
@@ -588,14 +661,16 @@ class ConfigScreenComponent extends React.Component<any, any> {
 				);
 			}
 		} else if (md.type === Setting.TYPE_INT) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			const onNumChange = (event: any) => {
 				updateSettingValue(key, event.target.value);
 			};
 
 			const label = [md.label()];
-			if (md.unitLabel) label.push(`(${md.unitLabel()})`);
+			if (md.unitLabel) label.push(`(${md.unitLabel(md.value)})`);
 
-			const inputStyle: any = Object.assign({}, textInputBaseStyle);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+			const inputStyle: any = { ...textInputBaseStyle };
 
 			return (
 				<div key={key} style={rowStyle}>
@@ -606,6 +681,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 						type="number"
 						style={inputStyle}
 						value={this.state.settings[key]}
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 						onChange={(event: any) => {
 							onNumChange(event);
 						}}
@@ -657,37 +733,38 @@ class ConfigScreenComponent extends React.Component<any, any> {
 		}
 	}
 
-	async onApplyClick() {
-		shared.saveSettings(this);
+	public async onApplyClick() {
+		const done = await shared.saveSettings(this);
+		if (!done) return;
+
 		await this.checkNeedRestart();
 	}
 
-	async onSaveClick() {
-		shared.saveSettings(this);
+	public async onSaveClick() {
+		const done = await shared.saveSettings(this);
+		if (!done) return;
 		await this.checkNeedRestart();
 		this.props.dispatch({ type: 'NAV_BACK' });
 	}
 
-	onCancelClick() {
+	public onCancelClick() {
 		this.props.dispatch({ type: 'NAV_BACK' });
 	}
 
-	hasChanges() {
+	public hasChanges() {
 		return !!this.state.changedSettingKeys.length;
 	}
 
-	render() {
+	public render() {
 		const theme = themeStyle(this.props.themeId);
 
-		const style = Object.assign({},
-			this.props.style,
-			{
-				overflow: 'hidden',
-				display: 'flex',
-				flexDirection: 'column',
-				backgroundColor: theme.backgroundColor3,
-			}
-		);
+		const style = {
+			...this.props.style,
+			overflow: 'hidden',
+			display: 'flex',
+			flexDirection: 'column',
+			backgroundColor: theme.backgroundColor3,
+		};
 
 		const settings = this.state.settings;
 
@@ -701,7 +778,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 		const hasChanges = this.hasChanges();
 
-		const settingComps = shared.settingsToComponents2(this, 'desktop', settings, this.state.selectedSectionName);
+		const settingComps = shared.settingsToComponents2(this, AppType.Desktop, settings, this.state.selectedSectionName);
 
 		// screenComp is a custom config screen, such as the encryption config screen or keymap config screen.
 		// These screens handle their own loading/saving of settings and have bespoke rendering.
@@ -710,8 +787,9 @@ class ConfigScreenComponent extends React.Component<any, any> {
 
 		if (screenComp) containerStyle.display = 'none';
 
-		const sections = shared.settingsSections({ device: 'desktop', settings });
+		const sections = shared.settingsSections({ device: AppType.Desktop, settings });
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const needRestartComp: any = this.state.needRestart ? (
 			<div style={{ ...theme.textStyle, padding: 10, paddingLeft: 24, backgroundColor: theme.warningBackgroundColor, color: theme.color }}>
 				{this.restartMessage()}
@@ -746,6 +824,7 @@ class ConfigScreenComponent extends React.Component<any, any> {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 const mapStateToProps = (state: any) => {
 	return {
 		themeId: state.settings.theme,

@@ -3,6 +3,7 @@ import shim from '../../shim';
 import { ButtonSpec, DialogResult, ViewHandle } from './api/types';
 const { toSystemSlashes } = require('../../path-utils');
 import PostMessageService, { MessageParticipant } from '../PostMessageService';
+import { PluginViewState } from './reducer';
 
 export enum ContainerType {
 	Panel = 'panel',
@@ -14,15 +15,19 @@ export interface Options {
 }
 
 interface CloseResponse {
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	resolve: Function;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	reject: Function;
 }
 
 // TODO: Copied from:
 // packages/app-desktop/gui/ResizableLayout/utils/findItemByKey.ts
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function findItemByKey(layout: any, key: string): any {
 	if (!layout) throw new Error('Layout cannot be null');
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	function recurseFind(item: any): any {
 		if (item.key === key) return item;
 
@@ -41,26 +46,32 @@ function findItemByKey(layout: any, key: string): any {
 export default class WebviewController extends ViewController {
 
 	private baseDir_: string;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	private messageListener_: Function = null;
 	private closeResponse_: CloseResponse = null;
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public constructor(handle: ViewHandle, pluginId: string, store: any, baseDir: string, containerType: ContainerType) {
 		super(handle, pluginId, store);
 		this.baseDir_ = toSystemSlashes(baseDir, 'linux');
 
+		const view: PluginViewState = {
+			id: this.handle,
+			type: this.type,
+			containerType: containerType,
+			html: '',
+			scripts: [],
+			// Opened is used for dialogs and mobile panels (which are shown
+			// like dialogs):
+			opened: containerType === ContainerType.Panel,
+			buttons: null,
+			fitToContent: true,
+		};
+
 		this.store.dispatch({
 			type: 'PLUGIN_VIEW_ADD',
 			pluginId: pluginId,
-			view: {
-				id: this.handle,
-				type: this.type,
-				containerType: containerType,
-				html: '',
-				scripts: [],
-				opened: false,
-				buttons: null,
-				fitToContent: true,
-			},
+			view,
 		});
 	}
 
@@ -68,6 +79,7 @@ export default class WebviewController extends ViewController {
 		return 'webview';
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private setStoreProp(name: string, value: any) {
 		this.store.dispatch({
 			type: 'PLUGIN_VIEW_PROP_SET',
@@ -104,6 +116,7 @@ export default class WebviewController extends ViewController {
 		});
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public postMessage(message: any) {
 
 		const messageId = `plugin_${Date.now()}${Math.random()}`;
@@ -120,12 +133,14 @@ export default class WebviewController extends ViewController {
 
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public async emitMessage(event: EmitMessageEvent): Promise<any> {
 
 		if (!this.messageListener_) return;
 		return this.messageListener_(event.message);
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public onMessage(callback: any) {
 		this.messageListener_ = callback;
 	}
@@ -134,13 +149,21 @@ export default class WebviewController extends ViewController {
 	// Specific to panels
 	// ---------------------------------------------
 
-	public async show(show: boolean = true): Promise<void> {
-		this.store.dispatch({
-			type: 'MAIN_LAYOUT_SET_ITEM_PROP',
-			itemKey: this.handle,
-			propName: 'visible',
-			propValue: show,
-		});
+	private showWithAppLayout() {
+		return this.containerType === ContainerType.Panel && !!this.store.getState().mainLayout;
+	}
+
+	public async show(show = true): Promise<void> {
+		if (this.showWithAppLayout()) {
+			this.store.dispatch({
+				type: 'MAIN_LAYOUT_SET_ITEM_PROP',
+				itemKey: this.handle,
+				propName: 'visible',
+				propValue: show,
+			});
+		} else {
+			this.setStoreProp('opened', show);
+		}
 	}
 
 	public async hide(): Promise<void> {
@@ -148,7 +171,14 @@ export default class WebviewController extends ViewController {
 	}
 
 	public get visible(): boolean {
-		const mainLayout = this.store.getState().mainLayout;
+		const appState = this.store.getState();
+
+		// Mobile: There is no appState.mainLayout
+		if (!this.showWithAppLayout()) {
+			return this.storeView.opened;
+		}
+
+		const mainLayout = appState.mainLayout;
 		const item = findItemByKey(mainLayout, this.handle);
 		return item ? item.visible : false;
 	}
@@ -165,6 +195,7 @@ export default class WebviewController extends ViewController {
 
 		this.setStoreProp('opened', true);
 
+		// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 		return new Promise((resolve: Function, reject: Function) => {
 			this.closeResponse_ = { resolve, reject };
 		});

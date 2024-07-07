@@ -6,7 +6,9 @@ import { Profile, ProfileConfig } from '@joplin/lib/services/profileConfig/types
 import { loadProfileConfig as libLoadProfileConfig, saveProfileConfig as libSaveProfileConfig } from '@joplin/lib/services/profileConfig/index';
 import RNFetchBlob from 'rn-fetch-blob';
 
+// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 let dispatch_: Function = null;
+// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 export const setDispatch = (dispatch: Function) => {
 	dispatch_ = dispatch;
 };
@@ -24,9 +26,15 @@ export const getResourceDir = (profile: Profile, isSubProfile: boolean) => {
 	return `${getProfilesRootDir()}/resources-${profile.id}`;
 };
 
-export const getDatabaseName = (profile: Profile, isSubProfile: boolean) => {
-	if (!isSubProfile) return 'joplin.sqlite';
-	return `joplin-${profile.id}.sqlite`;
+export const getPluginDataDir = (profile: Profile, isSubProfile: boolean) => {
+	const suffix = isSubProfile ? `-${profile.id}` : '';
+	return `${getProfilesRootDir()}/plugin-data${suffix}`;
+};
+
+// The suffix is for debugging only
+export const getDatabaseName = (profile: Profile, isSubProfile: boolean, suffix = '') => {
+	if (!isSubProfile) return `joplin${suffix}.sqlite`;
+	return `joplin-${profile.id}${suffix}.sqlite`;
 };
 
 export const loadProfileConfig = async () => {

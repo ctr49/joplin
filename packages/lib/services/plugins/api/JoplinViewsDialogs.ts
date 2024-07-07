@@ -1,8 +1,11 @@
+/* eslint-disable multiline-comment-style */
+
 import Plugin from '../Plugin';
 import createViewHandle from '../utils/createViewHandle';
 import WebviewController, { ContainerType } from '../WebviewController';
 import { ButtonSpec, ViewHandle, DialogResult } from './types';
 import { _ } from '../../../locale';
+import { JoplinViewsDialogs as JoplinViewsDialogsImplementation } from '../BasePlatformImplementation';
 
 /**
  * Allows creating and managing dialogs. A dialog is modal window that
@@ -35,11 +38,13 @@ import { _ } from '../../../locale';
  */
 export default class JoplinViewsDialogs {
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private store: any;
 	private plugin: Plugin;
-	private implementation_: any;
+	private implementation_: JoplinViewsDialogsImplementation;
 
-	constructor(implementation: any, plugin: Plugin, store: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public constructor(implementation: any, plugin: Plugin, store: any) {
 		this.store = store;
 		this.plugin = plugin;
 		this.implementation_ = implementation;
@@ -52,7 +57,7 @@ export default class JoplinViewsDialogs {
 	/**
 	 * Creates a new dialog
 	 */
-	async create(id: string): Promise<ViewHandle> {
+	public async create(id: string): Promise<ViewHandle> {
 		if (!id) {
 			this.plugin.deprecationNotice('1.5', 'Creating a view without an ID is deprecated. To fix it, change your call to `joplin.views.dialogs.create("my-unique-id")`', true);
 			id = `${this.plugin.viewCount}`;
@@ -67,14 +72,26 @@ export default class JoplinViewsDialogs {
 	/**
 	 * Displays a message box with OK/Cancel buttons. Returns the button index that was clicked - "0" for OK and "1" for "Cancel"
 	 */
-	async showMessageBox(message: string): Promise<number> {
+	public async showMessageBox(message: string): Promise<number> {
 		return this.implementation_.showMessageBox(`${_('(In plugin: %s)', this.plugin.manifest.name)}\n\n${message}`);
+	}
+
+	/**
+	 * Displays a dialog to select a file or a directory. Same options and
+	 * output as
+	 * https://www.electronjs.org/docs/latest/api/dialog#dialogshowopendialogbrowserwindow-options
+	 *
+	 * <span class="platform-desktop">desktop</span>
+	 */
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public async showOpenDialog(options: any): Promise<any> {
+		return this.implementation_.showOpenDialog(options);
 	}
 
 	/**
 	 * Sets the dialog HTML content
 	 */
-	async setHtml(handle: ViewHandle, html: string) {
+	public async setHtml(handle: ViewHandle, html: string) {
 		return this.controller(handle).html = html;
 	}
 
@@ -88,14 +105,14 @@ export default class JoplinViewsDialogs {
 	/**
 	 * Sets the dialog buttons.
 	 */
-	async setButtons(handle: ViewHandle, buttons: ButtonSpec[]) {
+	public async setButtons(handle: ViewHandle, buttons: ButtonSpec[]) {
 		return this.controller(handle).buttons = buttons;
 	}
 
 	/**
 	 * Opens the dialog
 	 */
-	async open(handle: ViewHandle): Promise<DialogResult> {
+	public async open(handle: ViewHandle): Promise<DialogResult> {
 		return this.controller(handle).open();
 	}
 
@@ -104,7 +121,7 @@ export default class JoplinViewsDialogs {
 	 * When set to false, the dialog is set to 90vw and 80vh
 	 * @default true
 	 */
-	async setFitToContent(handle: ViewHandle, status: boolean) {
+	public async setFitToContent(handle: ViewHandle, status: boolean) {
 		return this.controller(handle).fitToContent = status;
 	}
 }

@@ -1,5 +1,6 @@
 import CommandService, { CommandContext, CommandDeclaration, CommandRuntime } from '@joplin/lib/services/CommandService';
 import { _ } from '@joplin/lib/locale';
+import { newNoteEnabledConditions } from './newNote';
 
 export const declaration: CommandDeclaration = {
 	name: 'newTodo',
@@ -9,9 +10,9 @@ export const declaration: CommandDeclaration = {
 
 export const runtime = (): CommandRuntime => {
 	return {
-		execute: async (_context: CommandContext, body: string = '') => {
+		execute: async (_context: CommandContext, body = '') => {
 			return CommandService.instance().execute('newNote', body, true);
 		},
-		enabledCondition: 'oneFolderSelected && !inConflictFolder',
+		enabledCondition: newNoteEnabledConditions,
 	};
 };

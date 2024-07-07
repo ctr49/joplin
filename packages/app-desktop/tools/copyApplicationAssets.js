@@ -62,6 +62,7 @@ const withRetry = async (fn) => {
 async function main() {
 	const langSourceDir = resolve(__dirname, '../../../Assets/TinyMCE/langs');
 	const buildLibDir = resolve(__dirname, '../vendor/lib');
+	const buildDir = resolve(__dirname, '../build');
 
 	const dirs = [
 		'tinymce',
@@ -73,8 +74,8 @@ async function main() {
 			dest: `${buildLibDir}/tinymce/langs`,
 		},
 		{
-			src: resolve(__dirname, '../../pdf-viewer/dist'),
-			dest: `${buildLibDir}/@joplin/pdf-viewer`,
+			src: `${nodeModulesDir}/tesseract.js-core`,
+			dest: `${buildDir}/tesseract.js-core`,
 		},
 	];
 
@@ -94,8 +95,12 @@ async function main() {
 			dest: `${buildLibDir}/@joplin/lib/services/plugins/sandboxProxy.js`,
 		},
 		{
-			src: resolve(__dirname, '../../pdf-viewer/index.html'),
-			dest: `${buildLibDir}/@joplin/pdf-viewer/index.html`,
+			src: `${nodeModulesDir}/pdfjs-dist/build/pdf.worker.min.js`,
+			dest: `${buildDir}/pdf.worker.min.js`,
+		},
+		{
+			src: `${nodeModulesDir}/tesseract.js/dist/worker.min.js`,
+			dest: `${buildDir}/tesseract.js/worker.min.js`,
 		},
 	];
 
@@ -146,6 +151,8 @@ async function main() {
 		s = s.split('.');
 		return s[0];
 	});
+
+	supportedLocales.sort();
 
 	const content = `module.exports = ${JSON.stringify(supportedLocales, null, 2)}`;
 

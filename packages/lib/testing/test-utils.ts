@@ -1,8 +1,8 @@
 /* eslint-disable require-atomic-updates */
 import BaseApplication from '../BaseApplication';
 import BaseModel from '../BaseModel';
-import Logger, { TargetType, LoggerWrapper, LogLevel } from '../Logger';
-import Setting from '../models/Setting';
+import Logger, { TargetType, LoggerWrapper, LogLevel } from '@joplin/utils/Logger';
+import Setting, { AppType, Env } from '../models/Setting';
 import BaseService from '../services/BaseService';
 import FsDriverNode from '../fs-driver-node';
 import time from '../time';
@@ -30,17 +30,17 @@ import MasterKey from '../models/MasterKey';
 import BaseItem from '../models/BaseItem';
 import { FileApi } from '../file-api';
 const FileApiDriverMemory = require('../file-api-driver-memory').default;
-const { FileApiDriverLocal } = require('../file-api-driver-local');
+import FileApiDriverLocal from '../file-api-driver-local';
 const { FileApiDriverWebDav } = require('../file-api-driver-webdav.js');
 const { FileApiDriverDropbox } = require('../file-api-driver-dropbox.js');
 const { FileApiDriverOneDrive } = require('../file-api-driver-onedrive.js');
-const { FileApiDriverAmazonS3 } = require('../file-api-driver-amazon-s3.js');
 import SyncTargetRegistry from '../SyncTargetRegistry';
 const SyncTargetMemory = require('../SyncTargetMemory.js');
-const SyncTargetFilesystem = require('../SyncTargetFilesystem.js');
+import SyncTargetFilesystem from '../SyncTargetFilesystem';
 const SyncTargetNextcloud = require('../SyncTargetNextcloud.js');
 const SyncTargetDropbox = require('../SyncTargetDropbox.js');
 const SyncTargetAmazonS3 = require('../SyncTargetAmazonS3.js');
+const SyncTargetWebDAV = require('../SyncTargetWebDAV.js');
 import SyncTargetJoplinServer from '../SyncTargetJoplinServer';
 import EncryptionService from '../services/e2ee/EncryptionService';
 import DecryptionWorker from '../services/DecryptionWorker';
@@ -49,7 +49,7 @@ import ResourceFetcher from '../services/ResourceFetcher';
 const WebDavApi = require('../WebDavApi');
 const DropboxApi = require('../DropboxApi');
 import JoplinServerApi from '../JoplinServerApi';
-import { FolderEntity } from '../services/database/types';
+import { FolderEntity, ResourceEntity } from '../services/database/types';
 import { credentialFile, readCredentialFile } from '../utils/credentialFiles';
 import SyncTargetJoplinCloud from '../SyncTargetJoplinCloud';
 import KeychainService from '../services/keychain/KeychainService';
@@ -59,9 +59,14 @@ import Synchronizer from '../Synchronizer';
 import SyncTargetNone from '../SyncTargetNone';
 import { setRSA } from '../services/e2ee/ppk';
 const md5 = require('md5');
-const { S3Client } = require('@aws-sdk/client-s3');
 const { Dirnames } = require('../services/synchronizer/utils/types');
 import RSA from '../services/e2ee/RSA.node';
+import { State as ShareState } from '../services/share/reducer';
+import initLib from '../initLib';
+import OcrDriverTesseract from '../services/ocr/drivers/OcrDriverTesseract';
+import OcrService from '../services/ocr/OcrService';
+import { createWorker } from 'tesseract.js';
+import { reg } from '../registry';
 
 // Each suite has its own separate data and temp directory so that multiple
 // suites can be run at the same time. suiteName is what is used to
@@ -101,6 +106,7 @@ const oldTestDir = `${__dirname}/../../app-cli/tests`;
 const logDir = `${oldTestDir}/logs`;
 const baseTempDir = `${oldTestDir}/tmp/${suiteName_}`;
 const supportDir = `${oldTestDir}/support`;
+export const ocrSampleDir = `${oldTestDir}/ocr_samples`;
 
 // We add a space in the data directory path as that will help uncover
 // various space-in-path issues.
@@ -120,6 +126,7 @@ SyncTargetRegistry.addClass(SyncTargetOneDrive);
 SyncTargetRegistry.addClass(SyncTargetNextcloud);
 SyncTargetRegistry.addClass(SyncTargetDropbox);
 SyncTargetRegistry.addClass(SyncTargetAmazonS3);
+SyncTargetRegistry.addClass(SyncTargetWebDAV);
 SyncTargetRegistry.addClass(SyncTargetJoplinServer);
 SyncTargetRegistry.addClass(SyncTargetJoplinCloud);
 
@@ -138,7 +145,7 @@ function setSyncTargetName(name: string) {
 	syncTargetName_ = name;
 	syncTargetId_ = SyncTargetRegistry.nameToId(syncTargetName_);
 	sleepTime = syncTargetId_ === SyncTargetRegistry.nameToId('filesystem') ? 1001 : 100;// 400;
-	isNetworkSyncTarget_ = ['nextcloud', 'dropbox', 'onedrive', 'amazon_s3', 'joplinServer'].includes(syncTargetName_);
+	isNetworkSyncTarget_ = ['nextcloud', 'dropbox', 'onedrive', 'amazon_s3', 'joplinServer', 'joplinCloud'].includes(syncTargetName_);
 	synchronizers_ = [];
 	return previousName;
 }
@@ -150,6 +157,7 @@ setSyncTargetName('memory');
 // setSyncTargetName('onedrive');
 // setSyncTargetName('amazon_s3');
 // setSyncTargetName('joplinServer');
+// setSyncTargetName('joplinCloud');
 
 // console.info(`Testing with sync target: ${syncTargetName_}`);
 
@@ -171,6 +179,7 @@ logger.addTarget(TargetType.Console);
 logger.setLevel(LogLevel.Warn); // Set to DEBUG to display sync process in console
 
 Logger.initializeGlobalLogger(logger);
+initLib(logger);
 
 BaseItem.loadClass('Note', Note);
 BaseItem.loadClass('Folder', Folder);
@@ -181,13 +190,14 @@ BaseItem.loadClass('MasterKey', MasterKey);
 BaseItem.loadClass('Revision', Revision);
 
 Setting.setConstant('appId', 'net.cozic.joplintest-cli');
-Setting.setConstant('appType', 'cli');
+Setting.setConstant('appType', AppType.Cli);
 Setting.setConstant('tempDir', baseTempDir);
 Setting.setConstant('cacheDir', baseTempDir);
+Setting.setConstant('resourceDir', baseTempDir);
 Setting.setConstant('pluginDataDir', `${profileDir}/profile/plugin-data`);
 Setting.setConstant('profileDir', profileDir);
 Setting.setConstant('rootProfileDir', rootProfileDir);
-Setting.setConstant('env', 'dev');
+Setting.setConstant('env', Env.Dev);
 
 BaseService.logger_ = logger;
 
@@ -209,7 +219,7 @@ function sleep(n: number) {
 	});
 }
 
-function msleep(ms: number) {
+function msleep(ms: number): Promise<void> {
 	// It seems setTimeout can sometimes last less time than the provided
 	// interval:
 	//
@@ -259,8 +269,9 @@ const settingFilename = (id: number): string => {
 	return `settings-${id}.json`;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 async function switchClient(id: number, options: any = null) {
-	options = Object.assign({}, { keychainEnabled: false }, options);
+	options = { keychainEnabled: false, ...options };
 
 	if (!databases_[id]) throw new Error(`Call setupDatabaseAndSynchronizer(${id}) first!!`);
 
@@ -301,20 +312,21 @@ async function clearDatabase(id: number = null) {
 	await ItemChange.waitForAllSaved();
 
 	const tableNames = [
-		'notes',
-		'folders',
-		'resources',
-		'tags',
-		'note_tags',
-		'master_keys',
-		'item_changes',
-		'note_resources',
-		'settings',
 		'deleted_items',
-		'sync_items',
-		'notes_normalized',
-		'revisions',
+		'folders',
+		'item_changes',
+		'items_normalized',
 		'key_values',
+		'master_keys',
+		'note_resources',
+		'note_tags',
+		'notes_normalized',
+		'notes',
+		'resources',
+		'revisions',
+		'settings',
+		'sync_items',
+		'tags',
 	];
 
 	const queries = [];
@@ -325,8 +337,9 @@ async function clearDatabase(id: number = null) {
 	await databases_[id].transactionExecBatch(queries);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 async function setupDatabase(id: number = null, options: any = null) {
-	options = Object.assign({}, { keychainEnabled: false }, options);
+	options = { keychainEnabled: false, ...options };
 
 	if (id === null) id = currentClient_;
 
@@ -367,6 +380,7 @@ async function setupDatabase(id: number = null, options: any = null) {
 	await clearSettingFile(id);
 	await loadKeychainServiceAndSettings(options.keychainEnabled ? KeychainServiceDriver : KeychainServiceDriverDummy);
 
+	reg.setDb(databases_[id]);
 	Setting.setValue('sync.target', syncTargetId());
 }
 
@@ -375,7 +389,8 @@ async function clearSettingFile(id: number) {
 	await fs.remove(Setting.settingFilePath);
 }
 
-export async function createFolderTree(parentId: string, tree: any[], num: number = 0): Promise<FolderEntity> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+export async function createFolderTree(parentId: string, tree: any[], num = 0): Promise<FolderEntity> {
 	let rootFolder: FolderEntity = null;
 
 	for (const item of tree) {
@@ -418,6 +433,24 @@ function pluginDir(id: number = null) {
 	return `${dataDir}/plugins-${id}`;
 }
 
+export interface CreateNoteAndResourceOptions {
+	path?: string;
+}
+
+const createNoteAndResource = async (options: CreateNoteAndResourceOptions = null) => {
+	options = {
+		path: `${supportDir}/photo.jpg`,
+		...options,
+	};
+
+	let note = await Note.save({});
+	note = await shim.attachFileToNote(note, options.path);
+	const resourceIds = await Note.linkedItemIds(note.body);
+	const resource: ResourceEntity = await Resource.load(resourceIds[0]);
+	return { note, resource };
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 async function setupDatabaseAndSynchronizer(id: number, options: any = null) {
 	if (id === null) id = currentClient_;
 
@@ -476,6 +509,7 @@ function synchronizer(id: number = null) {
 // This is like calling synchronizer.start() but it handles the
 // complexity of passing around the sync context depending on
 // the client.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 async function synchronizerStart(id: number = null, extraOptions: any = null) {
 	if (id === null) id = currentClient_;
 
@@ -483,7 +517,7 @@ async function synchronizerStart(id: number = null, extraOptions: any = null) {
 	const contextString = Setting.value(contextKey);
 	const context = contextString ? JSON.parse(contextString) : {};
 
-	const options = Object.assign({}, extraOptions);
+	const options = { ...extraOptions };
 	if (context) options.context = context;
 	const newContext = await synchronizer(id).start(options);
 
@@ -606,7 +640,7 @@ async function initFileApi() {
 		mustRunInBand();
 
 		const { parameters, setEnvOverride } = require('../parameters.js');
-		Setting.setConstant('env', 'dev');
+		Setting.setConstant('env', Env.Dev);
 		setEnvOverride('test');
 		const config = parameters().oneDriveTest;
 		const api = new OneDriveApi(config.id, config.secret, false);
@@ -621,6 +655,13 @@ async function initFileApi() {
 		const appDir = await api.appDirectory();
 		fileApi = new FileApi(appDir, new FileApiDriverOneDrive(api));
 	} else if (syncTargetId_ === SyncTargetRegistry.nameToId('amazon_s3')) {
+		// (Most of?) the @aws-sdk libraries depend on an old version of uuid
+		// that doesn't work with jest (without converting ES6 exports to CommonJS).
+		//
+		// Require it dynamically so that this doesn't break test environments that
+		// aren't configured to do this conversion.
+		const { FileApiDriverAmazonS3 } = require('../file-api-driver-amazon-s3.js');
+		const { S3Client } = require('@aws-sdk/client-s3');
 
 		// We make sure for S3 tests run in band because tests
 		// share the same directory which will cause locking errors.
@@ -632,7 +673,7 @@ async function initFileApi() {
 		if (!amazonS3Creds || !amazonS3Creds.credentials) throw new Error(`AWS auth JSON missing in ${amazonS3CredsPath} format should be: { "credentials": { "accessKeyId": "", "secretAccessKey": "", } "bucket": "mybucket", region: "", forcePathStyle: ""}`);
 		const api = new S3Client({ region: amazonS3Creds.region, credentials: amazonS3Creds.credentials, s3UseArnRegion: true, forcePathStyle: amazonS3Creds.forcePathStyle, endpoint: amazonS3Creds.endpoint });
 		fileApi = new FileApi('', new FileApiDriverAmazonS3(api, amazonS3Creds.bucket));
-	} else if (syncTargetId_ === SyncTargetRegistry.nameToId('joplinServer')) {
+	} else if (syncTargetId_ === SyncTargetRegistry.nameToId('joplinServer') || syncTargetId_ === SyncTargetRegistry.nameToId('joplinCloud')) {
 		mustRunInBand();
 
 		const joplinServerAuth = JSON.parse(await readCredentialFile('joplin-server-test-units-2.json'));
@@ -669,6 +710,7 @@ function fileApi() {
 	return fileApis_[syncTargetId_];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function objectsEqual(o1: any, o2: any) {
 	if (Object.getOwnPropertyNames(o1).length !== Object.getOwnPropertyNames(o2).length) return false;
 	for (const n in o1) {
@@ -678,6 +720,7 @@ function objectsEqual(o1: any, o2: any) {
 	return true;
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 async function checkThrowAsync(asyncFn: Function) {
 	let hasThrown = false;
 	try {
@@ -688,7 +731,8 @@ async function checkThrowAsync(asyncFn: Function) {
 	return hasThrown;
 }
 
-async function expectThrow(asyncFn: Function, errorCode: any = undefined) {
+// eslint-disable-next-line @typescript-eslint/ban-types, @typescript-eslint/no-explicit-any -- Old code before rule was applied, Old code before rule was applied
+async function expectThrow(asyncFn: Function, errorCode: any = undefined, errorMessage: string = undefined) {
 	let hasThrown = false;
 	let thrownError = null;
 	try {
@@ -700,6 +744,12 @@ async function expectThrow(asyncFn: Function, errorCode: any = undefined) {
 
 	if (!hasThrown) {
 		expect('not throw').toBe('throw');
+	} else if (errorMessage !== undefined) {
+		if (thrownError.message !== errorMessage) {
+			expect(`error message: ${thrownError.message}`).toBe(`error message: ${errorMessage}`);
+		} else {
+			expect(true).toBe(true);
+		}
 	} else if (thrownError.code !== errorCode) {
 		console.error(thrownError);
 		expect(`error code: ${thrownError.code}`).toBe(`error code: ${errorCode}`);
@@ -708,6 +758,7 @@ async function expectThrow(asyncFn: Function, errorCode: any = undefined) {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 async function expectNotThrow(asyncFn: Function) {
 	let thrownError = null;
 	try {
@@ -724,6 +775,7 @@ async function expectNotThrow(asyncFn: Function) {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 function checkThrow(fn: Function) {
 	let hasThrown = false;
 	try {
@@ -773,18 +825,22 @@ async function allSyncTargetItemsEncrypted() {
 	return totalCount === encryptedCount;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function id(a: any) {
 	return a.id;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function ids(a: any[]) {
 	return a.map(n => n.id);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function sortedIds(a: any[]) {
 	return ids(a).sort();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function at(a: any[], indexes: any[]) {
 	const out = [];
 	for (let i = 0; i < indexes.length; i++) {
@@ -803,11 +859,12 @@ async function createNTestFolders(n: number) {
 	return folders;
 }
 
-async function createNTestNotes(n: number, folder: any, tagIds: string[] = null, title: string = 'note') {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+async function createNTestNotes(n: number, folder: any, tagIds: string[] = null, title = 'note') {
 	const notes = [];
 	for (let i = 0; i < n; i++) {
 		const title_ = n > 1 ? `${title}${i}` : title;
-		const note = await Note.save({ title: title_, parent_id: folder.id, is_conflict: 0 });
+		const note = await Note.save({ title: title_, parent_id: folder.id, is_conflict: 0, deleted_time: 0 });
 		notes.push(note);
 		await time.msleep(10);
 	}
@@ -833,6 +890,12 @@ async function createNTestTags(n: number) {
 function tempFilePath(ext: string) {
 	return `${Setting.value('tempDir')}/${md5(Date.now() + Math.random())}.${ext}`;
 }
+
+const createTempFile = async (content = '') => {
+	const path = tempFilePath('txt');
+	await fs.writeFile(path, content, 'utf8');
+	return path;
+};
 
 async function createTempDir() {
 	const tempDirPath = `${baseTempDir}/${uuid.createNano()}`;
@@ -882,6 +945,7 @@ export async function naughtyStrings() {
 class TestApp extends BaseApplication {
 
 	private hasGui_: boolean;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private middlewareCalls_: any[];
 	private logger_: LoggerWrapper;
 
@@ -898,13 +962,14 @@ class TestApp extends BaseApplication {
 		return this.hasGui_;
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public async start(argv: any[]) {
 		this.logger_.info('Test app starting...');
 
 		if (!argv.includes('--profile')) {
 			argv = argv.concat(['--profile', `tests-build/profile/${uuid.create()}`]);
 		}
-		argv = await super.start(['', ''].concat(argv));
+		argv = await super.start(['', ''].concat(argv), { setupGlobalLogger: false });
 
 		// For now, disable sync and encryption to avoid spurious intermittent failures
 		// caused by them interupting processing and causing delays.
@@ -919,6 +984,7 @@ class TestApp extends BaseApplication {
 		this.logger_.info('Test app started...');
 	}
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	public async generalMiddleware(store: any, next: any, action: any) {
 		this.middlewareCalls_.push(true);
 		try {
@@ -953,4 +1019,59 @@ class TestApp extends BaseApplication {
 	}
 }
 
-export { supportDir, waitForFolderCount, afterAllCleanUp, exportDir, synchronizerStart, afterEachCleanUp, syncTargetName, setSyncTargetName, syncDir, createTempDir, isNetworkSyncTarget, kvStore, expectThrow, logger, expectNotThrow, resourceService, resourceFetcher, tempFilePath, allSyncTargetItemsEncrypted, msleep, setupDatabase, revisionService, setupDatabaseAndSynchronizer, db, synchronizer, fileApi, sleep, clearDatabase, switchClient, syncTargetId, objectsEqual, checkThrowAsync, checkThrow, encryptionService, loadEncryptionMasterKey, fileContentEqual, decryptionWorker, currentClientId, id, ids, sortedIds, at, createNTestNotes, createNTestFolders, createNTestTags, TestApp };
+const createTestShareData = (shareId: string): ShareState => {
+	return {
+		processingShareInvitationResponse: false,
+		shares: [],
+		shareInvitations: [
+			{
+				id: '',
+				master_key: {},
+				status: 0,
+				share: {
+					id: shareId,
+					folder_id: '',
+					master_key_id: '',
+					note_id: '',
+					type: 1,
+				},
+				can_read: 1,
+				can_write: 0,
+			},
+		],
+		shareUsers: {},
+	};
+};
+
+const simulateReadOnlyShareEnv = (shareId: string) => {
+	Setting.setValue('sync.target', 10);
+	Setting.setValue('sync.userId', 'abcd');
+	BaseItem.syncShareCache = createTestShareData(shareId);
+
+	return () => {
+		BaseItem.syncShareCache = null;
+		Setting.setValue('sync.userId', '');
+	};
+};
+
+export const newOcrService = () => {
+	const driver = new OcrDriverTesseract({ createWorker });
+	return new OcrService(driver);
+};
+
+export const mockMobilePlatform = (platform: string) => {
+	const originalMobilePlatform = shim.mobilePlatform;
+	const originalIsNode = shim.isNode;
+
+	shim.mobilePlatform = () => platform;
+	shim.isNode = () => false;
+
+	return {
+		reset: () => {
+			shim.mobilePlatform = originalMobilePlatform;
+			shim.isNode = originalIsNode;
+		},
+	};
+};
+
+export { supportDir, createNoteAndResource, createTempFile, createTestShareData, simulateReadOnlyShareEnv, waitForFolderCount, afterAllCleanUp, exportDir, synchronizerStart, afterEachCleanUp, syncTargetName, setSyncTargetName, syncDir, createTempDir, isNetworkSyncTarget, kvStore, expectThrow, logger, expectNotThrow, resourceService, resourceFetcher, tempFilePath, allSyncTargetItemsEncrypted, msleep, setupDatabase, revisionService, setupDatabaseAndSynchronizer, db, synchronizer, fileApi, sleep, clearDatabase, switchClient, syncTargetId, objectsEqual, checkThrowAsync, checkThrow, encryptionService, loadEncryptionMasterKey, fileContentEqual, decryptionWorker, currentClientId, id, ids, sortedIds, at, createNTestNotes, createNTestFolders, createNTestTags, TestApp };

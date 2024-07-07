@@ -7,32 +7,40 @@ const { themeStyle } = require('@joplin/lib/theme');
 
 interface Props {
 	themeId: number;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	style: any;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	items: any[];
+	disabled: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 class ToolbarBaseComponent extends React.Component<Props, any> {
 
-	render() {
+	public render() {
 		const theme = themeStyle(this.props.themeId);
 
-		const style: any = Object.assign({
-			display: 'flex',
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+		const style: any = { display: 'flex',
 			flexDirection: 'row',
 			boxSizing: 'border-box',
 			backgroundColor: theme.backgroundColor3,
 			padding: theme.toolbarPadding,
-			paddingRight: theme.mainPadding,
-		}, this.props.style);
+			paddingRight: theme.mainPadding, ...this.props.style };
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const groupStyle: any = {
 			display: 'flex',
 			flexDirection: 'row',
 			boxSizing: 'border-box',
+			minWidth: 0,
 		};
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const leftItemComps: any[] = [];
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const centerItemComps: any[] = [];
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const rightItemComps: any[] = [];
 
 		if (this.props.items) {
@@ -45,13 +53,12 @@ class ToolbarBaseComponent extends React.Component<Props, any> {
 
 				if (!key) key = `${o.type}_${i}`;
 
-				const props = Object.assign(
-					{
-						key: key,
-						themeId: this.props.themeId,
-					},
-					o
-				);
+				const props = {
+					key: key,
+					themeId: this.props.themeId,
+					disabled: this.props.disabled,
+					...o,
+				};
 
 				if (o.name === 'toggleEditors') {
 					rightItemComps.push(<ToggleEditorsButton
@@ -77,7 +84,7 @@ class ToolbarBaseComponent extends React.Component<Props, any> {
 				<div style={groupStyle}>
 					{centerItemComps}
 				</div>
-				<div style={Object.assign({}, groupStyle, { flex: 1, justifyContent: 'flex-end' })}>
+				<div style={{ ...groupStyle, flex: 1, justifyContent: 'flex-end' }}>
 					{rightItemComps}
 				</div>
 			</div>
@@ -85,6 +92,7 @@ class ToolbarBaseComponent extends React.Component<Props, any> {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 const mapStateToProps = (state: any) => {
 	return { themeId: state.settings.theme };
 };

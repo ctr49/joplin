@@ -1,26 +1,33 @@
 import * as React from 'react';
 import { themeStyle } from '@joplin/lib/theme';
 import { _ } from '@joplin/lib/locale';
+import { focus } from '@joplin/lib/utils/focusHandler';
 
 interface Props {
 	themeId: number;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onNext: Function;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onPrevious: Function;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onClose: Function;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onChange: Function;
 	query: string;
 	searching: boolean;
 	resultCount: number;
 	selectedIndex: number;
 	visiblePanes: string[];
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	style: any;
 }
 
 class NoteSearchBar extends React.Component<Props> {
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private backgroundColor: any;
 
-	constructor(props: Props) {
+	public constructor(props: Props) {
 		super(props);
 
 		this.searchInput_change = this.searchInput_change.bind(this);
@@ -28,25 +35,26 @@ class NoteSearchBar extends React.Component<Props> {
 		this.previousButton_click = this.previousButton_click.bind(this);
 		this.nextButton_click = this.nextButton_click.bind(this);
 		this.closeButton_click = this.closeButton_click.bind(this);
+
+		// eslint-disable-next-line no-restricted-properties
 		this.focus = this.focus.bind(this);
 
 		this.backgroundColor = undefined;
 	}
 
-	style() {
+	public style() {
 		const theme = themeStyle(this.props.themeId);
 
 		const style = {
-			root: Object.assign({}, theme.textStyle, {
-				backgroundColor: theme.backgroundColor,
-				color: theme.colorFaded,
-			}),
+			root: { ...theme.textStyle, backgroundColor: theme.backgroundColor,
+				color: theme.colorFaded },
 		};
 
 		return style;
 	}
 
-	buttonIconComponent(iconName: string, clickHandler: any, isEnabled: boolean) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public buttonIconComponent(iconName: string, clickHandler: any, isEnabled: boolean) {
 		const theme = themeStyle(this.props.themeId);
 
 		const searchButton = {
@@ -74,12 +82,14 @@ class NoteSearchBar extends React.Component<Props> {
 		);
 	}
 
-	searchInput_change(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private searchInput_change(event: any) {
 		const query = event.currentTarget.value;
 		this.triggerOnChange(query);
 	}
 
-	searchInput_keyDown(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private searchInput_keyDown(event: any) {
 		if (event.keyCode === 13) {
 			// ENTER
 			event.preventDefault();
@@ -106,28 +116,30 @@ class NoteSearchBar extends React.Component<Props> {
 		}
 	}
 
-	previousButton_click() {
+	private previousButton_click() {
 		if (this.props.onPrevious) this.props.onPrevious();
 	}
 
-	nextButton_click() {
+	private nextButton_click() {
 		if (this.props.onNext) this.props.onNext();
 	}
 
-	closeButton_click() {
+	private closeButton_click() {
 		if (this.props.onClose) this.props.onClose();
 	}
 
-	triggerOnChange(query: string) {
+	public triggerOnChange(query: string) {
 		if (this.props.onChange) this.props.onChange(query);
 	}
 
-	focus() {
-		(this.refs.searchInput as any).focus();
+	public focus() {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+		focus('NoteSearchBar::focus', this.refs.searchInput as any);
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		(this.refs.searchInput as any).select();
 	}
 
-	render() {
+	public render() {
 		const query = this.props.query ? this.props.query : '';
 
 		// backgroundColor needs to cached to a local variable to prevent the
@@ -150,12 +162,10 @@ class NoteSearchBar extends React.Component<Props> {
 		const previousButton = this.buttonIconComponent('fa-chevron-up', this.previousButton_click, buttonEnabled);
 		const nextButton = this.buttonIconComponent('fa-chevron-down', this.nextButton_click, buttonEnabled);
 
-		const textStyle = Object.assign({
-			fontSize: theme.fontSize,
+		const textStyle = { fontSize: theme.fontSize,
 			fontFamily: theme.fontFamily,
 			color: theme.colorFaded,
-			backgroundColor: theme.backgroundColor,
-		});
+			backgroundColor: theme.backgroundColor };
 
 		const matchesFoundString = (query.length > 0) ? (
 			<div style={textStyle}>

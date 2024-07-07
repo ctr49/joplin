@@ -8,12 +8,8 @@ const { _ } = require('@joplin/lib/locale');
 import shim from '@joplin/lib/shim';
 import Setting from '@joplin/lib/models/Setting';
 
-// We need this to suppress the useless warning
-// https://github.com/oblador/react-native-vector-icons/issues/1465
-Icon.loadFont().catch((error: any) => { console.info(error); });
-
 class CameraView extends Component {
-	constructor() {
+	public constructor() {
 		super();
 
 		const dimensions = Dimensions.get('window');
@@ -33,18 +29,19 @@ class CameraView extends Component {
 		this.onLayout = this.onLayout.bind(this);
 	}
 
-	onLayout(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public onLayout(event: any) {
 		this.setState({
 			screenWidth: event.nativeEvent.layout.width,
 			screenHeight: event.nativeEvent.layout.height,
 		});
 	}
 
-	back_onPress() {
+	private back_onPress() {
 		if (this.props.onCancel) this.props.onCancel();
 	}
 
-	reverse_onPress() {
+	private reverse_onPress() {
 		if (this.props.cameraType === RNCamera.Constants.Type.back) {
 			Setting.setValue('camera.type', RNCamera.Constants.Type.front);
 		} else {
@@ -52,7 +49,7 @@ class CameraView extends Component {
 		}
 	}
 
-	ratio_onPress() {
+	private ratio_onPress() {
 		if (this.state.ratios.length <= 1) return;
 
 		let index = this.state.ratios.indexOf(this.props.cameraRatio);
@@ -61,7 +58,7 @@ class CameraView extends Component {
 		Setting.setValue('camera.ratio', this.state.ratios[index]);
 	}
 
-	async photo_onPress() {
+	private async photo_onPress() {
 		if (!this.camera || !this.props.onPhoto) return;
 
 		this.setState({ snapping: true });
@@ -78,14 +75,15 @@ class CameraView extends Component {
 
 	}
 
-	async onCameraReady() {
+	public async onCameraReady() {
 		if (this.supportsRatios()) {
 			const ratios = await this.camera.getSupportedRatiosAsync();
 			this.setState({ ratios: ratios });
 		}
 	}
 
-	renderButton(onPress: Function, iconNameOrIcon: any, style: any) {
+	// eslint-disable-next-line @typescript-eslint/ban-types, @typescript-eslint/no-explicit-any -- Old code before rule was applied, Old code before rule was applied
+	public renderButton(onPress: Function, iconNameOrIcon: any, style: any) {
 		let icon = null;
 
 		if (typeof iconNameOrIcon === 'string') {
@@ -103,7 +101,7 @@ class CameraView extends Component {
 		}
 
 		return (
-			<TouchableOpacity onPress={onPress} style={Object.assign({}, style)}>
+			<TouchableOpacity onPress={onPress} style={{ ...style }}>
 				<View style={{ borderRadius: 32, width: 60, height: 60, borderColor: '#00000040', borderWidth: 1, borderStyle: 'solid', backgroundColor: '#ffffff77', justifyContent: 'center', alignItems: 'center', alignSelf: 'baseline' }}>
 					{ icon }
 				</View>
@@ -111,10 +109,12 @@ class CameraView extends Component {
 		);
 	}
 
-	fitRectIntoBounds(rect: any, bounds: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public fitRectIntoBounds(rect: any, bounds: any) {
 		const rectRatio = rect.width / rect.height;
 		const boundsRatio = bounds.width / bounds.height;
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const newDimensions: any = {};
 
 		// Rect is more landscape than bounds - fit to width
@@ -129,7 +129,7 @@ class CameraView extends Component {
 		return newDimensions;
 	}
 
-	cameraRect(ratio: string) {
+	public cameraRect(ratio: string) {
 		// To keep the calculations simpler, it's assumed that the phone is in
 		// portrait orientation. Then at the end we swap the values if needed.
 		const splitted = ratio.split(':');
@@ -151,19 +151,20 @@ class CameraView extends Component {
 		return output;
 	}
 
-	supportsRatios() {
+	public supportsRatios() {
 		return shim.mobilePlatform() === 'android';
 	}
 
-	render() {
-		const photoIcon = this.state.snapping ? 'md-checkmark' : 'md-camera';
+	public render() {
+		const photoIcon = this.state.snapping ? 'checkmark' : 'camera';
 
 		const displayRatios = this.supportsRatios() && this.state.ratios.length > 1;
 
-		const reverseCameraButton = this.renderButton(this.reverse_onPress, 'md-camera-reverse', { flex: 1, flexDirection: 'row', justifyContent: 'flex-start', marginLeft: 20 });
+		const reverseCameraButton = this.renderButton(this.reverse_onPress, 'camera-reverse', { flex: 1, flexDirection: 'row', justifyContent: 'flex-start', marginLeft: 20 });
 		const ratioButton = !displayRatios ? <View style={{ flex: 1 }}/> : this.renderButton(this.ratio_onPress, <Text style={{ fontWeight: 'bold', fontSize: 20 }}>{Setting.value('camera.ratio')}</Text>, { flex: 1, flexDirection: 'row', justifyContent: 'flex-end', marginRight: 20 });
 
 		let cameraRatio = '4:3';
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const cameraProps: any = {};
 
 		if (displayRatios) {
@@ -176,10 +177,11 @@ class CameraView extends Component {
 		cameraRect.top = (this.state.screenHeight - cameraRect.height) / 2;
 
 		return (
-			<View style={Object.assign({}, this.props.style, { position: 'relative' })} onLayout={this.onLayout}>
+			<View style={{ ...this.props.style, position: 'relative' }} onLayout={this.onLayout}>
 				<View style={{ position: 'absolute', backgroundColor: '#000000', width: '100%', height: '100%' }}/>
 				<RNCamera
-					style={Object.assign({ position: 'absolute' }, cameraRect)}
+					style={({ position: 'absolute', ...cameraRect })}
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 					ref={(ref: any) => {
 						this.camera = ref;
 					}}
@@ -200,7 +202,7 @@ class CameraView extends Component {
 							<TouchableOpacity onPress={this.back_onPress}>
 								<View style={{ marginLeft: 5, marginTop: 5, borderColor: '#00000040', borderWidth: 1, borderStyle: 'solid', borderRadius: 90, width: 50, height: 50, display: 'flex', backgroundColor: '#ffffff77', justifyContent: 'center', alignItems: 'center' }}>
 									<Icon
-										name={'md-arrow-back'}
+										name={'arrow-back'}
 										style={{
 											fontSize: 40,
 											color: 'black',
@@ -233,6 +235,7 @@ class CameraView extends Component {
 	}
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 const mapStateToProps = (state: any) => {
 	return {
 		cameraRatio: state.settings['camera.ratio'],

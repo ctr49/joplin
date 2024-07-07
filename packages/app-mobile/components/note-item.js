@@ -5,7 +5,7 @@ const { Text, TouchableOpacity, View, StyleSheet } = require('react-native');
 const { Checkbox } = require('./checkbox.js');
 const Note = require('@joplin/lib/models/Note').default;
 const time = require('@joplin/lib/time').default;
-const { themeStyle } = require('./global-style.js');
+const { themeStyle } = require('./global-style');
 const { _ } = require('@joplin/lib/locale');
 
 class NoteItemComponent extends Component {
@@ -51,16 +51,16 @@ class NoteItemComponent extends Component {
 			},
 		};
 
-		styles.listItemWithCheckbox = Object.assign({}, styles.listItem);
+		styles.listItemWithCheckbox = { ...styles.listItem };
 		delete styles.listItemWithCheckbox.paddingTop;
 		delete styles.listItemWithCheckbox.paddingBottom;
 		delete styles.listItemWithCheckbox.paddingLeft;
 
-		styles.listItemTextWithCheckbox = Object.assign({}, styles.listItemText);
+		styles.listItemTextWithCheckbox = { ...styles.listItemText };
 		styles.listItemTextWithCheckbox.marginTop = styles.listItem.paddingTop - 1;
 		styles.listItemTextWithCheckbox.marginBottom = styles.listItem.paddingBottom;
 
-		styles.selectionWrapperSelected = Object.assign({}, styles.selectionWrapper);
+		styles.selectionWrapperSelected = { ...styles.selectionWrapper };
 		styles.selectionWrapperSelected.backgroundColor = theme.selectedColor;
 
 		this.styles_[this.props.themeId] = StyleSheet.create(styles);
@@ -75,6 +75,8 @@ class NoteItemComponent extends Component {
 			todo_completed: checked ? time.unixMs() : 0,
 		};
 		await Note.save(newNote);
+
+		this.props.dispatch({ type: 'NOTE_SORT' });
 	}
 
 	onPress() {

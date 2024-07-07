@@ -1,8 +1,11 @@
+/* eslint-disable jest/require-top-level-describe */
+
 import KeychainService from '@joplin/lib/services/keychain/KeychainService';
 import shim from '@joplin/lib/shim';
 import Setting from '@joplin/lib/models/Setting';
 import { db, setupDatabaseAndSynchronizer, switchClient } from '@joplin/lib/testing/test-utils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 function describeIfCompatible(name: string, fn: any, elseFn: any) {
 	if (['win32', 'darwin'].includes(shim.platformName())) {
 		return describe(name, fn);
@@ -11,7 +14,7 @@ function describeIfCompatible(name: string, fn: any, elseFn: any) {
 	}
 }
 
-describeIfCompatible('services_KeychainService', function() {
+describeIfCompatible('services_KeychainService', () => {
 
 	beforeEach(async () => {
 		await setupDatabaseAndSynchronizer(1, { keychainEnabled: true });
@@ -50,7 +53,7 @@ describeIfCompatible('services_KeychainService', function() {
 	}));
 
 	it('should delete db settings if they have been saved in keychain', (async () => {
-		// First save some secure settings and make sure it ends up in the databse
+		// First save some secure settings and make sure it ends up in the database
 		KeychainService.instance().enabled = false;
 
 		Setting.setValue('sync.5.password', 'password');

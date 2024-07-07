@@ -11,7 +11,12 @@ const DialogModalLayer = styled.div`
 	background-color: rgba(0,0,0,0.6);
 	align-items: flex-start;
 	justify-content: center;
-	overflow: hidden;
+
+	overflow: auto;
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
 `;
 
 const DialogRoot = styled.div`
@@ -26,8 +31,10 @@ const DialogRoot = styled.div`
 `;
 
 interface Props {
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	renderContent: Function;
 	className?: string;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onClose?: Function;
 }
 

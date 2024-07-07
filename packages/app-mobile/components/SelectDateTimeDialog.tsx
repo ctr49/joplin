@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { themeStyle } from '@joplin/lib/theme';
+import { themeStyle } from './global-style';
 import { _ } from '@joplin/lib/locale';
 const { Modal, View, Button, Text, StyleSheet } = require('react-native');
 import time from '@joplin/lib/time';
@@ -50,9 +50,11 @@ const styles = StyleSheet.create({
 	},
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 export default class SelectDateTimeDialog extends React.PureComponent<any, any> {
 
-	constructor(props: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public constructor(props: any) {
 		super(props);
 
 		this.state = {
@@ -67,37 +69,38 @@ export default class SelectDateTimeDialog extends React.PureComponent<any, any> 
 		this.onSetDate = this.onSetDate.bind(this);
 	}
 
-	UNSAFE_componentWillReceiveProps(newProps: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public UNSAFE_componentWillReceiveProps(newProps: any) {
 		if (newProps.date !== this.state.date) {
 			this.setState({ date: newProps.date });
 		}
 	}
 
-	onAccept() {
+	public onAccept() {
 		if (this.props.onAccept) this.props.onAccept(this.state.date);
 	}
 
-	onReject() {
+	public onReject() {
 		if (this.props.onReject) this.props.onReject();
 	}
 
-	onClear() {
+	public onClear() {
 		if (this.props.onAccept) this.props.onAccept(null);
 	}
 
-	onPickerConfirm(selectedDate: Date) {
+	public onPickerConfirm(selectedDate: Date) {
 		this.setState({ date: selectedDate, showPicker: false });
 	}
 
-	onPickerCancel() {
+	public onPickerCancel() {
 		this.setState({ showPicker: false });
 	}
 
-	onSetDate() {
+	public onSetDate() {
 		this.setState({ showPicker: true });
 	}
 
-	renderContent() {
+	public renderContent() {
 		const theme = themeStyle(this.props.themeId);
 
 		return (
@@ -118,7 +121,7 @@ export default class SelectDateTimeDialog extends React.PureComponent<any, any> 
 		);
 	}
 
-	render() {
+	public render() {
 		const modalVisible = this.props.shown;
 
 		if (!modalVisible) return null;

@@ -20,14 +20,15 @@ const { clipboard } = require('electron');
 
 interface Props {
 	themeId: number;
-	noteIds: Array<string>;
+	noteIds: string[];
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onClose: Function;
 	shares: StateShare[];
 	syncTargetId: number;
 }
 
 function styles_(props: Props) {
-	return buildStyle('ShareNoteDialog', props.themeId, (theme: any) => {
+	return buildStyle('ShareNoteDialog', props.themeId, theme => {
 		return {
 			root: {
 				minWidth: 500,
@@ -68,8 +69,6 @@ function styles_(props: Props) {
 }
 
 export function ShareNoteDialog(props: Props) {
-	console.info('Render ShareNoteDialog');
-
 	const [notes, setNotes] = useState<NoteEntity[]>([]);
 	const [recursiveShare, setRecursiveShare] = useState<boolean>(false);
 	const [sharesState, setSharesState] = useState<string>('unknown');
@@ -154,6 +153,7 @@ export function ShareNoteDialog(props: Props) {
 		}
 	}, [recursiveShare, notes]);
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	const unshareNoteButton_click = async (event: any) => {
 		await ShareService.instance().unshareNote(event.noteId);
 		await ShareService.instance().refreshShares();
@@ -171,6 +171,7 @@ export function ShareNoteDialog(props: Props) {
 		);
 	};
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	const renderNoteList = (notes: any) => {
 		const noteComps = [];
 		for (const note of notes) {
@@ -236,4 +237,4 @@ const mapStateToProps = (state: AppState) => {
 	};
 };
 
-export default connect(mapStateToProps)(ShareNoteDialog as any);
+export default connect(mapStateToProps)(ShareNoteDialog);

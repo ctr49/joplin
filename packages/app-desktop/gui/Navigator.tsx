@@ -5,11 +5,12 @@ import { AppState } from '../app.reducer';
 const bridge = require('@electron/remote').require('./bridge').default;
 
 interface Props {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	route: any;
 }
 
 class NavigatorComponent extends React.Component<Props> {
-	UNSAFE_componentWillReceiveProps(newProps: Props) {
+	public UNSAFE_componentWillReceiveProps(newProps: Props) {
 		if (newProps.route) {
 			const screenInfo = this.props.screens[newProps.route.routeName];
 			const devMarker = Setting.value('env') === 'dev' ? ` (DEV - ${Setting.value('profileDir')})` : '';
@@ -21,7 +22,7 @@ class NavigatorComponent extends React.Component<Props> {
 		}
 	}
 
-	updateWindowTitle(title: string) {
+	public updateWindowTitle(title: string) {
 		try {
 			if (bridge().window()) bridge().window().setTitle(title);
 		} catch (error) {
@@ -29,7 +30,7 @@ class NavigatorComponent extends React.Component<Props> {
 		}
 	}
 
-	render() {
+	public render() {
 		if (!this.props.route) throw new Error('Route must not be null');
 
 		const route = this.props.route;

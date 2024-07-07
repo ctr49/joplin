@@ -9,6 +9,7 @@ export const declaration: CommandDeclaration = {
 	label: () => _('Create new profile...'),
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 export const runtime = (comp: any): CommandRuntime => {
 	return {
 		execute: async (context: CommandContext) => {
@@ -22,7 +23,7 @@ export const runtime = (comp: any): CommandRuntime => {
 							const { newConfig, newProfile } = createNewProfile(context.state.profileConfig, answer);
 							newConfig.currentProfileId = newProfile.id;
 							await saveProfileConfig(`${Setting.value('rootProfileDir')}/profiles.json`, newConfig);
-							await restart(false);
+							await restart();
 						}
 
 						comp.setState({ promptOptions: null });

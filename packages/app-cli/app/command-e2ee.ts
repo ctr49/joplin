@@ -12,15 +12,15 @@ const imageType = require('image-type');
 const readChunk = require('read-chunk');
 
 class Command extends BaseCommand {
-	usage() {
+	public usage() {
 		return 'e2ee <command> [path]';
 	}
 
-	description() {
+	public description() {
 		return _('Manages E2EE configuration. Commands are `enable`, `disable`, `decrypt`, `status`, `decrypt-file`, and `target-status`.'); // `generate-ppk`
 	}
 
-	options() {
+	public options() {
 		return [
 			// This is here mostly for testing - shouldn't be used
 			['-p, --password <password>', 'Use this password as master password (For security reasons, it is not recommended to use this option).'],
@@ -30,9 +30,11 @@ class Command extends BaseCommand {
 		];
 	}
 
-	async action(args: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public async action(args: any) {
 		const options = args.options;
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 		const askForMasterKey = async (error: any) => {
 			const masterKeyId = error.masterKeyId;
 			const password = await this.prompt(_('Enter master password:'), { type: 'string', secure: true });
@@ -179,6 +181,7 @@ class Command extends BaseCommand {
 
 			const dirPaths = function(targetPath: string) {
 				const paths: string[] = [];
+				// eslint-disable-next-line github/array-foreach -- Old code before rule was applied
 				fs.readdirSync(targetPath).forEach((path: string) => {
 					paths.push(path);
 				});

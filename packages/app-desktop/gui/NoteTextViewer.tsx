@@ -1,23 +1,31 @@
 import PostMessageService, { MessageResponse, ResponderComponentType } from '@joplin/lib/services/PostMessageService';
 import * as React from 'react';
 import { reg } from '@joplin/lib/registry';
+import { focus } from '@joplin/lib/utils/focusHandler';
 
 interface Props {
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onDomReady: Function;
+	// eslint-disable-next-line @typescript-eslint/ban-types -- Old code before rule was applied
 	onIpcMessage: Function;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	viewerStyle: any;
 	contentMaxWidth?: number;
 	themeId: number;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 export default class NoteTextViewerComponent extends React.Component<Props, any> {
 
-	private initialized_: boolean = false;
-	private domReady_: boolean = false;
+	private initialized_ = false;
+	private domReady_ = false;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private webviewRef_: any;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private webviewListeners_: any = null;
 
-	constructor(props: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public constructor(props: any) {
 		super(props);
 
 		this.webviewRef_ = React.createRef();
@@ -41,20 +49,23 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 		this.webview_message = this.webview_message.bind(this);
 	}
 
-	webview_domReady(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private webview_domReady(event: any) {
 		this.domReady_ = true;
 		if (this.props.onDomReady) this.props.onDomReady(event);
 	}
 
-	webview_ipcMessage(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private webview_ipcMessage(event: any) {
 		if (this.props.onIpcMessage) this.props.onIpcMessage(event);
 	}
 
-	webview_load() {
+	private webview_load() {
 		this.webview_domReady({});
 	}
 
-	webview_message(event: any) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	private webview_message(event: any) {
 		if (!event.data || event.data.target !== 'main') return;
 
 		const callName = event.data.name;
@@ -68,11 +79,11 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 		}
 	}
 
-	domReady() {
+	public domReady() {
 		return this.domReady_;
 	}
 
-	initWebview() {
+	public initWebview() {
 		const wv = this.webviewRef_.current;
 
 		if (!this.webviewListeners_) {
@@ -92,7 +103,7 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 		this.webviewRef_.current.contentWindow.addEventListener('message', this.webview_message);
 	}
 
-	destroyWebview() {
+	public destroyWebview() {
 		const wv = this.webviewRef_.current;
 		if (!wv || !this.initialized_) return;
 
@@ -115,28 +126,28 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 		this.domReady_ = false;
 	}
 
-	focus() {
+	public focus() {
 		if (this.webviewRef_.current) {
-			this.webviewRef_.current.focus();
+			focus('NoteTextViewer::focus', this.webviewRef_.current);
 		}
 	}
 
-	tryInit() {
+	public tryInit() {
 		if (!this.initialized_ && this.webviewRef_.current) {
 			this.initWebview();
 			this.initialized_ = true;
 		}
 	}
 
-	componentDidMount() {
+	public componentDidMount() {
 		this.tryInit();
 	}
 
-	componentDidUpdate() {
+	public componentDidUpdate() {
 		this.tryInit();
 	}
 
-	componentWillUnmount() {
+	public componentWillUnmount() {
 		this.destroyWebview();
 	}
 
@@ -144,7 +155,8 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 	// Wrap WebView functions
 	// ----------------------------------------------------------------
 
-	send(channel: string, arg0: any = null, arg1: any = null) {
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
+	public send(channel: string, arg0: any = null, arg1: any = null) {
 		const win = this.webviewRef_.current.contentWindow;
 
 		if (channel === 'focus') {
@@ -172,8 +184,8 @@ export default class NoteTextViewerComponent extends React.Component<Props, any>
 	// Wrap WebView functions (END)
 	// ----------------------------------------------------------------
 
-	render() {
-		const viewerStyle = Object.assign({}, { border: 'none' }, this.props.viewerStyle);
+	public render() {
+		const viewerStyle = { border: 'none', ...this.props.viewerStyle };
 		return <iframe className="noteTextViewer" ref={this.webviewRef_} style={viewerStyle} src="gui/note-viewer/index.html"></iframe>;
 	}
 }

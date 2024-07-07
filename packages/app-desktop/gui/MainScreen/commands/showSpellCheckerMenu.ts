@@ -19,8 +19,9 @@ export const runtime = (): CommandRuntime => {
 			useSpellChecker = useSpellChecker === null ? context.state.settings['spellChecker.enabled'] : useSpellChecker;
 
 			const menuItems = SpellCheckerService.instance().spellCheckerConfigMenuItems(selectedLanguages, useSpellChecker);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			const menu = Menu.buildFromTemplate(menuItems as any);
-			menu.popup(bridge().window());
+			menu.popup({ window: bridge().window() });
 		},
 
 		mapStateToTitle(state: AppState): string {
@@ -28,9 +29,12 @@ export const runtime = (): CommandRuntime => {
 			const languages = state.settings['spellChecker.languages'];
 			if (languages.length === 0) return null;
 			const s: string[] = [];
+			// eslint-disable-next-line github/array-foreach -- Old code before rule was applied
 			languages.forEach((language: string) => {
-				s.push(language.split('-')[0]);
+				const onlyLanguage = language.split('-')[0];
+				if (!s.includes(onlyLanguage)) { s.push(onlyLanguage); }
 			});
+
 			return s.join(', ');
 		},
 	};

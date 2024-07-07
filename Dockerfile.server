@@ -16,6 +16,7 @@ WORKDIR /build
 
 COPY .yarn/plugins ./.yarn/plugins
 COPY .yarn/releases ./.yarn/releases
+COPY .yarn/patches ./.yarn/patches
 COPY package.json .
 COPY .yarnrc.yml .
 COPY yarn.lock .
@@ -30,6 +31,7 @@ COPY packages/fork-uslug ./packages/fork-uslug
 COPY packages/htmlpack ./packages/htmlpack
 COPY packages/renderer ./packages/renderer
 COPY packages/tools ./packages/tools
+COPY packages/utils ./packages/utils
 COPY packages/lib ./packages/lib
 COPY packages/server ./packages/server
 
@@ -69,7 +71,7 @@ EXPOSE ${APP_PORT}
 # https://github.com/nodejs/docker-node/blob/main/docs/BestPractices.md#handling-kernel-signals
 WORKDIR /home/$user/packages/server
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "dist/app.js"]
+CMD ["yarn", "start-prod"]
 
 # Build-time metadata
 # https://github.com/opencontainers/image-spec/blob/master/annotations.md

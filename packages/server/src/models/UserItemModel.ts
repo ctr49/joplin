@@ -82,10 +82,10 @@ export default class UserItemModel extends BaseModel<UserItem> {
 			.where('user_items.user_id', '=', userId);
 	}
 
-	public async deleteByUserItem(userId: Uuid, itemId: Uuid): Promise<void> {
+	public async deleteByUserItem(userId: Uuid, itemId: Uuid, options: UserItemDeleteOptions = null): Promise<void> {
 		const userItem = await this.byUserAndItemId(userId, itemId);
 		if (!userItem) throw new ErrorNotFound(`No such user_item: ${userId} / ${itemId}`);
-		await this.deleteBy({ byUserItem: userItem });
+		await this.deleteBy({ ...options, byUserItem: userItem });
 	}
 
 	public async deleteByItemIds(itemIds: Uuid[], options: UserItemDeleteOptions = null): Promise<void> {
@@ -114,6 +114,9 @@ export default class UserItemModel extends BaseModel<UserItem> {
 
 	public async add(userId: Uuid, itemId: Uuid, options: SaveOptions = {}): Promise<void> {
 		const item = await this.models().item().load(itemId, { fields: ['id', 'name'] });
+		if (!item) {
+			throw new ErrorNotFound(`No such item: ${itemId}`);
+		}
 		await this.addMulti(userId, [item], options);
 	}
 
@@ -174,6 +177,7 @@ export default class UserItemModel extends BaseModel<UserItem> {
 		} else if (options.byUserItem) {
 			userItems = [options.byUserItem];
 		} else if (options.byUserItemIds) {
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 			userItems = await this.loadByIds(options.byUserItemIds as any);
 		} else {
 			throw new Error('Invalid options');
@@ -185,6 +189,9 @@ export default class UserItemModel extends BaseModel<UserItem> {
 		await this.withTransaction(async () => {
 			for (const userItem of userItems) {
 				const item = items.find(i => i.id === userItem.item_id);
+
+				// The item may have been deleted between the async calls above
+				if (!item) continue;
 
 				if (options.recordChanges && this.models().item().shouldRecordChange(item.name)) {
 					await this.models().change().save({

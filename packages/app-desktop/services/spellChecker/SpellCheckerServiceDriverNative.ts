@@ -2,13 +2,14 @@
 
 import SpellCheckerServiceDriverBase from '@joplin/lib/services/spellChecker/SpellCheckerServiceDriverBase';
 import bridge from '../bridge';
-import Logger from '@joplin/lib/Logger';
+import Logger from '@joplin/utils/Logger';
 import { languageCodeOnly, localesFromLanguageCode } from '@joplin/lib/locale';
 
 const logger = Logger.create('SpellCheckerServiceDriverNative');
 
 export default class SpellCheckerServiceDriverNative extends SpellCheckerServiceDriverBase {
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Old code before rule was applied
 	private session(): any {
 		return bridge().window().webContents.session;
 	}
