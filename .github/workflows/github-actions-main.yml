@@ -5,7 +5,7 @@ jobs:
     if: github.repository == 'ctr49/joplin'
     # Do not use unbuntu-latest because it causes `The operation was canceled` failures:
     # https://github.com/actions/runner-images/issues/6709
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       should_skip: ${{ steps.skip_check.outputs.should_skip }}
     steps:
@@ -23,7 +23,7 @@ jobs:
       matrix:
         # Do not use unbuntu-latest because it causes `The operation was canceled` failures:
         # https://github.com/actions/runner-images/issues/6709
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     steps:
 
       # Trying to fix random networking issues on Windows
@@ -34,7 +34,14 @@ jobs:
 
       - name: Disable TCP/UDP offload on Linux
         if: runner.os == 'Linux'
-        run: sudo ethtool -K eth0 tx off rx off
+        run: |
+          sudo ethtool -K eth0 tx off rx off
+          sudo swapoff -a
+          sudo fallocate -l 15G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo swapon --show
 
       - name: Disable TCP/UDP offload on macOS
         if: runner.os == 'macOS'
@@ -87,7 +94,7 @@ jobs:
         with:
           # We need to pin the version to 18.15, because 18.16+ fails with this error:
           # https://github.com/facebook/react-native/issues/36440
-          node-version: '18.15.0'
+          node-version: '18'
           cache: 'yarn'
 
       - name: Install Yarn
@@ -164,7 +171,7 @@ jobs:
       matrix:
         # Do not use unbuntu-latest because it causes `The operation was canceled` failures:
         # https://github.com/actions/runner-images/issues/6709
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
     steps:
 
       - name: Install Docker Engine
